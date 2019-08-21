@@ -7,6 +7,7 @@ var liveReload = require("easy-livereload");
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+var gameServer = require('./server/server');
 
 var app = express();
 
@@ -66,5 +67,7 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
+
+app.use(gameServer(app));
 
 module.exports = app;
