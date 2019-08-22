@@ -1,18 +1,15 @@
 
 const Colyseus = require("colyseus");
 const http = require("http");
-const game = require("../public/javascripts/game");
+const TDMP = require("../public/javascripts/game");
 
 class TDMPRoom extends Colyseus.Room {
   constructor() {
     super();
     this.maxClients = 2;
 
-    this.board = {
-      width: 25,
-      height: 33,
-      cells: []
-    };
+    this.board = new TDMP.Board(25, 33);
+    this.gameState = new TDMP.State(this.board);
 
     this.topRegion = {
       x: 0,
@@ -31,27 +28,7 @@ class TDMPRoom extends Colyseus.Room {
   }
 
   initBoard() {
-    // Init the board with nothing
-    for (let x = 0; x < this.board.width; x++) {
-      let row = [];
-      for (let y = 0; y < this.board.height; y++) {
-        row.push(TDMPRoom.emptyCell());
-      }
-      this.board.cells.push(row);
-    }
-    this.board.cells[12][0].state = "spawner";
-    this.board.cells[12][this.board.height - 1].state = "spawner";
-  }
-
-  static emptyCell() {
-    return {
-      state: "empty"
-    };
-
-  }
-
-  static inRect(rect, p) {
-    return p.x >= rect.x && p.y >= rect.y && p.x < rect.x + rect.width && p.y < rect.y + rect.height;
+    this.board.createSpawners({x: 12, y: 0}, {x: 12, y: this.board.height - 1});
   }
 
   onInit(options) {
@@ -73,10 +50,7 @@ class TDMPRoom extends Colyseus.Room {
         playableRegion: client.region
       }
     });
-    this.send(client, {
-      type: "board",
-      value: this.board.cells
-    });
+    this.sendBoard(client);
   }
 
   onLeave(client) {
@@ -88,22 +62,30 @@ class TDMPRoom extends Colyseus.Room {
       case "chat":
         this.chat(`(${client.sessionId}) ${data.value}`);
         break;
-      case "board":
-        for (let x = 0; x < this.board.width; x ++) {
-          for (let y = 0; y < this.board.height; y ++) {
-            if (TDMPRoom.inRect(client.region, {x: x, y: y})) {
-              this.board.cells[x][y] = data.value[x][y];
-            }
-          }
+      case "addTower":
+        if (TDMP.inRect(client.region, data.value)) {
+          this.gameState.addTower(data.value);
         }
-
-        this.clients.filter((c) => c !== client).forEach((c) => this.send(c, {
-          type: "board",
-          value: this.board.cells
-        }));
-
+        this.clients.forEach((c) => this.sendBoard(c));
+        break;
+      case "removeTower":
+        if (TDMP.inRect(client.region, data.value)) {
+          this.gameState.removeTower(data.value);
+        }
+        this.clients.forEach((c) => this.sendBoard(c));
         break;
     }
+  }
+
+  sendBoard(client) {
+    this.send(client, {
+      type: "board",
+      value: {
+        cells: this.board.cells,
+        spawners: this.board.spawners,
+        towers: this.gameState.towers,
+      }
+    });
   }
 
   onDispose() {
