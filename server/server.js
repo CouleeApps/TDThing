@@ -9,7 +9,7 @@ class TDMPRoom extends Colyseus.Room {
     this.maxClients = 2;
 
     this.board = new TDMP.Board(25, 33);
-    this.gameState = new TDMP.State(this.board);
+    this.gameState = new TDMP.GameState(this.board);
 
     this.topRegion = {
       x: 0,
@@ -39,17 +39,9 @@ class TDMPRoom extends Colyseus.Room {
     this.chat(`${client.sessionId} joined.`);
     let isTop = this.clients.length === 0 || !this.clients[0].isTop;
     client.isTop = isTop;
-    client.region = isTop ? this.topRegion : this.bottomRegion;
-    this.send(client, {
-      type: "layout",
-      value: {
-        board: {
-          width: this.board.width,
-          height: this.board.height
-        },
-        playableRegion: client.region
-      }
-    });
+    client.clientState = new TDMP.ClientState(this.gameState);
+    client.clientState.playableRegion = isTop ? this.topRegion : this.bottomRegion;
+    this.sendState(client);
     this.sendBoard(client);
   }
 
@@ -63,18 +55,32 @@ class TDMPRoom extends Colyseus.Room {
         this.chat(`(${client.sessionId}) ${data.value}`);
         break;
       case "addTower":
-        if (TDMP.inRect(client.region, data.value)) {
-          this.gameState.addTower(data.value);
+        if (client.clientState.canPlaceTowerWithPath(data.value.origin, data.value.type)) {
+          this.gameState.addTower(data.value.origin, data.value.type);
         }
         this.clients.forEach((c) => this.sendBoard(c));
         break;
       case "removeTower":
-        if (TDMP.inRect(client.region, data.value)) {
-          this.gameState.removeTower(data.value);
+        if (TDMP.inRect(client.clientState.playableRegion, data.value.origin)) {
+          this.gameState.removeTower(data.value.origin);
         }
         this.clients.forEach((c) => this.sendBoard(c));
         break;
     }
+  }
+
+  sendState(client) {
+    this.send(client, {
+      type: "state",
+      value: {
+        board: {
+          width: this.board.width,
+          height: this.board.height
+        },
+        towerTypes: this.gameState.towerTypes,
+        playableRegion: client.clientState.playableRegion
+      }
+    });
   }
 
   sendBoard(client) {

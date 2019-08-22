@@ -10,46 +10,59 @@ const extent = {
 };
 
 const styles = {
-  "hoverCell": function(context, rect) {
+  "hoverCell": (context, rect) => {
     context.fillStyle = "rgba(255,255,255,0.5)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "hoverTower": function(context, rect) {
+  "hoverTower": (context, rect) => {
     context.fillStyle = "rgba(0,0,0,0.3)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "opponent": function(context, rect) {
+  "opponent": (context, rect) => {
     context.fillStyle = "rgba(255,255,255,0.3)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "error": function(context, rect) {
+  "error": (context, rect) => {
     context.fillStyle = "rgba(255, 0, 0, 0.3)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "empty": function(context, rect) {
+  "empty": (context, rect) => {
     context.fillStyle = "rgba(0, 0, 0, 1.0)";
     context.strokeStyle = "#fff";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "tower": function(context, rect) {
-    context.fillStyle = "rgba(0, 255, 0, 1.0)";
-    context.strokeStyle = "#fff";
+  "tower": (context, rect) => {
+    context.fillStyle = "rgba(0, 0, 0, 1.0)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
-    context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "path": function(context, rect) {
+  "path": (context, rect) => {
     context.fillStyle = "rgba(0, 0, 255, 1.0)";
     context.strokeStyle = "#fff";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "spawner": function(context, rect) {
+  "spawner": (context, rect) => {
     context.fillStyle = "rgba(255, 0, 0, 1.0)";
     context.strokeStyle = "#fff";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
+};
+
+const towerStyles = {
+  "normal": (context, rect) => {
+    context.fillStyle = "rgba(0, 255, 0, 1.0)";
+    context.strokeStyle = "#fff";
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+    context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  },
+  "chonky": (context, rect) => {
+    context.fillStyle = "rgba(255, 0, 255, 1.0)";
+    context.strokeStyle = "#fff";
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+    context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  }
 };
 
 // Board position -> canvas rect
@@ -59,6 +72,14 @@ function getCellRect(boardPos) {
     y: boardPos.y * (extent.height / board.height),
     width: (extent.width / board.width),
     height: (extent.height / board.height)
+  };
+}
+function getTowerRect(tower) {
+  return {
+    x: tower.origin.x * (extent.width / board.width),
+    y: tower.origin.y * (extent.height / board.height),
+    width: tower.extent.x * (extent.width / board.width),
+    height: tower.extent.y * (extent.height / board.height)
   };
 }
 // Canvas position -> board position
@@ -78,9 +99,31 @@ function initCanvas() {
   });
 }
 
+function initInterface() {
+  initCanvas();
+  $("#types").empty();
+  Object.keys(gameState.towerTypes).forEach((type) => {
+    let button = $("<button></button>")
+      .text(type)
+      .click(() => {
+        clientState.placeType = type;
+        drawState();
+      });
+    $("#types").append(button);
+  });
+}
+
 function drawCell(state, boardPos) {
   let rect = getCellRect(boardPos);
   let style = styles[state];
+  if (style !== undefined) {
+    style(context, rect);
+  }
+}
+
+function drawTower(tower) {
+  let rect = getTowerRect(tower);
+  let style = towerStyles[tower.type];
   if (style !== undefined) {
     style(context, rect);
   }
@@ -104,53 +147,57 @@ function drawState() {
   for (let y = 0; y < board.height; y ++) {
     for (let x = 0; x < board.width; x ++) {
       let boardPos = {x: x, y: y};
-      if (!inRect(state.playableRegion, boardPos)) {
+      if (!inRect(clientState.playableRegion, boardPos)) {
         drawCell("opponent", boardPos);
       }
     }
   }
 
-  let currentTower = state.getTower(state.lastMouse);
+  gameState.towers.forEach(drawTower);
+
+  let currentTower = gameState.getTower(clientState.lastMouse);
   if (currentTower) {
-    board.getSquarePoses(state.lastMouse).forEach((pos) => {
+    gameState.getTowerPoses(clientState.lastMouse, currentTower.type).forEach((pos) => {
       drawCell("hoverTower", pos);
     });
-  } else if (canPlaceTower(state.lastMouse)) {
-    let type = state.canPlaceTowerWithPath(state.lastMouse) ? "hoverCell" : "error";
-    board.getSquarePoses(state.lastMouse).forEach((pos) => {
+  } else if (gameState.canPlaceTower(clientState.lastMouse, clientState.placeType)) {
+    let type = clientState.canPlaceTowerWithPath(clientState.lastMouse, clientState.placeType) ? "hoverCell" : "error";
+    gameState.getTowerPoses(clientState.lastMouse, clientState.placeType).forEach((pos) => {
       drawCell(type, pos);
     });
   }
 }
 
-canvas.mousemove(function(e) {
+canvas.mousemove((e) => {
   let boardPos = getBoardPos({x: e.offsetX, y: e.offsetY});
-  boardPos = tryBump(boardPos);
+  boardPos = gameState.tryBump(boardPos, clientState.placeType);
 
-  if (canPlaceTower(boardPos)) {
-    let tower = state.getTower(boardPos);
+  if (gameState.canPlaceTower(boardPos, clientState.placeType)) {
   } else {
-    let tower = state.getTower(boardPos);
+    let tower = gameState.getTower(boardPos);
     if (tower !== null) {
       boardPos = tower.origin;
     }
   }
 
-  state.lastMouse = boardPos;
+  clientState.lastMouse = boardPos;
   drawState();
 });
 
-canvas.mousedown(function(e) {
+canvas.mousedown((e) => {
   let boardPos = getBoardPos({x: e.offsetX, y: e.offsetY});
-  boardPos = tryBump(boardPos);
+  boardPos = gameState.tryBump(boardPos, clientState.placeType);
 
-  let tower = state.getTower(boardPos);
+  let tower = gameState.getTower(boardPos);
   if (tower === null) {
-    if (canPlaceTower(boardPos) && state.canPlaceTowerWithPath(state.lastMouse)) {
+    if (clientState.canPlaceTowerWithPath(clientState.lastMouse, clientState.placeType)) {
       //Create Tower
       room.send({
         type: "addTower",
-        value: boardPos
+        value: {
+          origin: boardPos,
+          type: clientState.placeType
+        }
       });
     }
   } else {
@@ -158,15 +205,18 @@ canvas.mousedown(function(e) {
     boardPos = tower.origin;
     room.send({
       type: "removeTower",
-      value: boardPos
+      value: {
+        origin: boardPos,
+        type: clientState.placeType
+      }
     });
   }
 
-  state.lastMouse = boardPos;
+  clientState.lastMouse = boardPos;
   drawState();
 });
 
-$(document.body).keydown(function(e) {
+$(document.body).keydown((e) => {
   if (e.keyCode === 13) {
     let path = board.getSolution();
 
@@ -175,5 +225,3 @@ $(document.body).keydown(function(e) {
     });
   }
 });
-
-initCanvas();

@@ -1,6 +1,7 @@
 
 let board = new Board();
-let state = new State(board);
+let gameState = new GameState(board);
+let clientState = new ClientState(gameState);
 
 let client = new Colyseus.Client('ws://' + window.location.hostname + ':3020');
 let room = client.join("tdmp");
@@ -11,12 +12,16 @@ room.onJoin.add(() => {
 });
 room.onMessage.add((data) => {
   switch (data.type) {
-    case "layout":
+    case "state":
       board.width = data.value.board.width;
       board.height = data.value.board.height;
-      state.playableRegion = data.value.playableRegion;
+      gameState.towerTypes = data.value.towerTypes;
+      clientState.playableRegion = data.value.playableRegion;
       board.init();
-      state.init();
+      gameState.init();
+
+      initInterface();
+
       drawState();
       break;
     case "chat":
@@ -25,7 +30,7 @@ room.onMessage.add((data) => {
     case "board":
       board.cells = data.value.cells;
       board.spawners = data.value.spawners;
-      state.towers = data.value.towers;
+      gameState.towers = data.value.towers;
       drawState();
       break;
   }

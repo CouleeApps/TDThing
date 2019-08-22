@@ -26,22 +26,25 @@ class Board {
     this.cells[boardPos.x][boardPos.y] = cell;
   }
 
-  getSquarePoses(boardPos) {
-    if (boardPos.x >= this.width - 2) {
-      boardPos.x = this.width - 2;
+  getSquarePoses(boardPos, extent) {
+    if (boardPos.x >= this.width - extent.x) {
+      boardPos.x = this.width - extent.x;
     }
-    if (boardPos.y >= this.height - 2) {
-      boardPos.y = this.height - 2;
+    if (boardPos.y >= this.height - extent.y) {
+      boardPos.y = this.height - extent.y;
     }
 
-    let squarePoses = [
-      boardPos,
-      {x: boardPos.x + 1, y: boardPos.y},
-      {x: boardPos.x, y: boardPos.y + 1},
-      {x: boardPos.x + 1, y: boardPos.y + 1},
-    ];
+    let poses = [];
+    for (let y = 0; y < extent.y; y ++) {
+      for (let x = 0; x < extent.x; x ++) {
+        poses.push({
+          x: boardPos.x + x,
+          y: boardPos.y + y
+        })
+      }
+    }
 
-    return squarePoses;
+    return poses;
   }
 
   createSpawners(s1, s2) {
@@ -54,8 +57,8 @@ class Board {
     let toKey = (pos) => pos.x + " " + pos.y;
     // BFS!
     let queue = [this.spawners[0]];
-    let backPointers = {};
-    backPointers[toKey(this.spawners[0])] = [this.spawners[0]];
+    let paths = {};
+    paths[toKey(this.spawners[0])] = [this.spawners[0]];
 
     while (queue.length > 0) {
       let top = queue.shift();
@@ -72,38 +75,49 @@ class Board {
         if (n.x < 0 || n.y < 0 || n.x >= this.width || n.y >= this.height)
           return false;
         // Searched
-        if (backPointers[toKey(n)] !== undefined)
+        if (paths[toKey(n)] !== undefined)
           return false;
         // Pending
         if (queue.indexOf(n) !== -1)
           return false;
         // Taken
-        return board.getCell(n).state === "empty" || board.getCell(n).state === "spawner";
+        return this.getCell(n).state === "empty" || this.getCell(n).state === "spawner";
       });
       neighbors.forEach((n) => {
         queue.push(n);
-        backPointers[toKey(n)] = [top].concat(backPointers[toKey(top)]);
+        paths[toKey(n)] = [top].concat(paths[toKey(top)]);
       });
     }
-    if (backPointers[toKey(this.spawners[1])] === undefined) {
+    if (paths[toKey(this.spawners[1])] === undefined) {
       return [];
     }
-    return [this.spawners[1]].concat(backPointers[toKey(this.spawners[1])]);
+    return [this.spawners[1]].concat(paths[toKey(this.spawners[1])]);
   }
 }
 
-class State {
+class GameState {
   constructor(board) {
-    this.mouseState = "placing";
-    this.lastMouse = {x: 0, y: 0};
-    this.playableRegion = {
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0
-    };
     this.towers = [];
     this.board = board;
+
+    this.towerTypes = {
+      "normal": {
+        extent: {
+          x: 2,
+          y: 2
+        },
+        health: 100,
+        damage: 1
+      },
+      "chonky": {
+        extent: {
+          x: 3,
+          y: 3
+        },
+        health: 400,
+        damage: 1
+      },
+    }
   }
 
   init() {
@@ -123,20 +137,22 @@ class State {
     return null;
   }
 
-  createTower(origin) {
-    let cells = this.board.getSquarePoses(origin);
-    this.board.getSquarePoses(origin).forEach((pos) => {
+  createTower(origin, type) {
+    let extent = this.towerTypes[type].extent;
+    let cells = this.getTowerPoses(origin, type);
+    cells.forEach((pos) => {
       this.board.setCell(pos, towerCell(origin));
     });
     return {
       origin: origin,
-      type: "normal",
+      extent: extent,
+      type: type,
       cells: cells
     };
   }
 
-  addTower(boardPos) {
-    let tower = this.createTower(boardPos);
+  addTower(boardPos, type) {
+    let tower = this.createTower(boardPos, type);
     this.towers.push(tower);
     return tower;
   }
@@ -149,17 +165,67 @@ class State {
     this.towers.splice(this.towers.indexOf(tower), 1);
   }
 
-  canPlaceTowerWithPath(boardPos) {
-    if (!canPlaceTower(boardPos)) {
-      return false;
-    }
-    this.addTower(boardPos);
-    let path = this.board.getSolution();
-    let can = path.length > 0;
-    this.removeTower(boardPos);
-    return can;
+  getTowerPoses(origin, type) {
+    return this.board.getSquarePoses(origin, this.towerTypes[type].extent);
   }
 
+  // If a tower can be placed unobstructed at the given location
+  canPlaceTower(origin, type) {
+    if (origin.x < 0 || origin.y < 0 || origin.x >= this.board.width || origin.y >= this.board.height) {
+      return false;
+    }
+    let poses = this.getTowerPoses(origin, type);
+    return poses.every((pos) => {
+      let state = this.board.getCell(pos).state;
+      return state === "empty" || state === "hover";
+    });
+  }
+
+  tryBump(boardPos, type) {
+    let bumps = [
+      boardPos,
+      {x: boardPos.x - 1, y: boardPos.y},
+      {x: boardPos.x, y: boardPos.y - 1},
+      {x: boardPos.x - 1, y: boardPos.y - 1}
+    ];
+    for (let i = 0; i < bumps.length; i ++) {
+      if (this.canPlaceTower(bumps[i], type)) {
+        return bumps[i];
+      }
+    }
+    return boardPos;
+  }
+}
+
+class ClientState {
+  constructor(gameState) {
+    this.gameState = gameState;
+    this.mouseState = "placing";
+    this.lastMouse = {x: 0, y: 0};
+    this.playableRegion = {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0
+    };
+    this.placeType = "normal";
+  }
+
+  // If the player can place a tower, unobstructed, maintaining the path
+  canPlaceTowerWithPath(boardPos, type) {
+    if (!this.gameState.canPlaceTower(boardPos, type)) {
+      return false;
+    }
+    let poses = this.gameState.getTowerPoses(boardPos, type);
+    if (poses.some((pos) => !inRect(this.playableRegion, pos))) {
+      return false;
+    }
+    this.gameState.addTower(boardPos, type);
+    let path = this.gameState.board.getSolution();
+    let can = path.length > 0;
+    this.gameState.removeTower(boardPos, type);
+    return can;
+  }
 }
 
 function eq(p0, p1) {
@@ -188,47 +254,15 @@ function towerCell(towerOrigin) {
   };
 }
 
-function canPlaceTower(boardPos) {
-  if (boardPos.x < 0 || boardPos.y < 0 || boardPos.x >= board.width || boardPos.y >= board.height) {
-    return false;
-  }
-  let squarePoses = board.getSquarePoses(boardPos);
-
-  if (squarePoses.some((pos) => !inRect(state.playableRegion, pos))) {
-    return false;
-  }
-
-  return squarePoses.every((pos) => {
-    let state = board.getCell(pos).state;
-    return state === "empty" || state === "hover";
-  });
-}
-
-function tryBump(boardPos) {
-  let bumps = [
-    boardPos,
-    {x: boardPos.x - 1, y: boardPos.y},
-    {x: boardPos.x, y: boardPos.y - 1},
-    {x: boardPos.x - 1, y: boardPos.y - 1}
-  ];
-  for (let i = 0; i < bumps.length; i ++) {
-    if (canPlaceTower(bumps[i])) {
-      return bumps[i];
-    }
-  }
-  return boardPos;
-}
-
 if (typeof(module) !== "undefined") {
   module.exports = {
     Board: Board,
-    State: State,
+    GameState: GameState,
+    ClientState: ClientState,
     eq: eq,
     inRect: inRect,
     emptyCell: emptyCell,
     emptyOpponentCell: emptyOpponentCell,
     towerCell: towerCell,
-    canPlaceTower: canPlaceTower,
-    tryBump: tryBump,
   }
 }
