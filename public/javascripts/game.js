@@ -98,6 +98,7 @@ class Board {
 class GameState {
   constructor(board) {
     this.towers = [];
+    this.units = [];
     this.board = board;
 
     this.towerTypes = {
@@ -107,7 +108,8 @@ class GameState {
           y: 2
         },
         health: 100,
-        damage: 1
+        damagePerMS: 0.001,
+        range: 5
       },
       "chonky": {
         extent: {
@@ -115,13 +117,50 @@ class GameState {
           y: 3
         },
         health: 400,
-        damage: 1
+        damagePerMS: 0.001,
+        range: 3
       },
-    }
+    };
+    this.unitTypes = {
+      "normal": {
+        msPerMove: 100,
+        health: 25,
+        damagePerMS: 0.001
+      }
+    };
+    this.init();
   }
 
   init() {
-
+    // Find all towers' effective areas
+    Object.keys(this.towerTypes).forEach((type) => {
+      let reachable = [];
+      let range = this.towerTypes[type].range;
+      let origin = {
+        x: this.towerTypes[type].extent.x / 2,
+        y: this.towerTypes[type].extent.y / 2
+      };
+      // Rough outer bounds to check
+      let bounds = {
+        min: {
+          x: Math.floor(origin.x - range),
+          y: Math.floor(origin.y - range)
+        },
+        max: {
+          x: Math.ceil(origin.x + range),
+          y: Math.ceil(origin.y + range)
+        },
+      };
+      // Filter to only include tiles in range
+      for (let x = bounds.min.x; x < bounds.max.x; x ++) {
+        for (let y = bounds.min.y; y < bounds.max.y; y ++) {
+          if (((x + 0.5) - origin.x) * ((x + 0.5) - origin.x) + ((y + 0.5) - origin.y) * ((y + 0.5) - origin.y) <= range * range) {
+            reachable.push({x: x, y: y});
+          }
+        }
+      }
+      this.towerTypes[type].reachable = reachable;
+    });
   }
 
   getTower(boardPos) {
@@ -143,11 +182,24 @@ class GameState {
     cells.forEach((pos) => {
       this.board.setCell(pos, towerCell(origin));
     });
+
+    let reachable = this.towerTypes[type].reachable.map((pos) => {
+      return {x: pos.x + origin.x, y: pos.y + origin.y};
+    }).filter((pos) => {
+      return (pos.x >= 0) && (pos.y >= 0) && (pos.x < this.board.width) && (pos.y < this.board.height);
+    });
+
     return {
       origin: origin,
+      center: {
+        x: origin.x + extent.x / 2,
+        y: origin.y + extent.y / 2,
+      },
       extent: extent,
       type: type,
-      cells: cells
+      cells: cells,
+      reachable: reachable,
+      health: this.towerTypes[type].health,
     };
   }
 
@@ -195,6 +247,75 @@ class GameState {
     }
     return boardPos;
   }
+
+  spawnUnit(side, type) {
+    let path = this.board.getSolution();
+    if (side === "top") {
+      path.reverse();
+    }
+    let unit = {
+      type: type,
+      side: side,
+      path: path,
+      health: this.unitTypes[type].health,
+      accumulatedMS: 0,
+      extent: {x: 1, y: 1},
+      origin: path[0],
+      destination: path[path.length - 1],
+      position: path[0],
+      pathPosition: 0
+    };
+    this.units.push(unit);
+  }
+
+  destroyUnit(unit) {
+    this.units.splice(this.units.indexOf(unit), 1);
+  }
+
+  moveUnits(deltaMS) {
+    let updated = false;
+    this.units.forEach((unit) => {
+      unit.accumulatedMS += deltaMS;
+      if (unit.accumulatedMS >= this.unitTypes[unit.type].msPerMove) {
+        unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
+        unit.pathPosition += 1;
+        unit.position = unit.path[unit.pathPosition];
+        unit.center =
+
+        updated = true;
+
+        if (unit.position === unit.destination) {
+          this.destroyUnit(unit);
+        }
+      }
+    });
+
+    return updated;
+  }
+
+  towerAttack(deltaMS) {
+    let updated = false;
+    this.towers.forEach((tower) => {
+      let reaching = this.units.filter((unit) => {
+        return tower.reachable.some((pos) => eq(pos, unit.position));
+      });
+      if (reaching.length > 0) {
+        updated = true;
+
+        reaching.sort((u1, u2) => {
+          distSq(u1.position)
+        })
+
+        reaching.forEach((unit) => {
+          unit.health -= this.towerTypes[tower.type].damagePerMS * deltaMS;
+          if (unit.health <= 0) {
+            this.destroyUnit(unit);
+          }
+        });
+      }
+    });
+    return updated;
+  }
 }
 
 class ClientState {
@@ -209,6 +330,7 @@ class ClientState {
       height: 0
     };
     this.placeType = "normal";
+    this.health = 100;
   }
 
   // If the player can place a tower, unobstructed, maintaining the path
@@ -230,6 +352,9 @@ class ClientState {
 
 function eq(p0, p1) {
   return p0.x === p1.x && p0.y === p1.y;
+}
+function distSq(p0, p1) {
+  return (p0.x - p1.x) * (p0.x - p1.x) + (p0.y - p1.y) * (p0.y - p1.y);
 }
 function inRect(rect, p) {
   return p.x >= rect.x && p.y >= rect.y && p.x < rect.x + rect.width && p.y < rect.y + rect.height;

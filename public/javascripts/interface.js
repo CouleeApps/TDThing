@@ -18,6 +18,10 @@ const styles = {
     context.fillStyle = "rgba(0,0,0,0.3)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
   },
+  "towerRange": (context, rect) => {
+    context.fillStyle = "rgba(255,0,0,0.3)";
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+  },
   "opponent": (context, rect) => {
     context.fillStyle = "rgba(255,255,255,0.3)";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -51,17 +55,25 @@ const styles = {
 };
 
 const towerStyles = {
-  "normal": (context, rect) => {
+  "normal": (tower, context, rect) => {
     context.fillStyle = "rgba(0, 255, 0, 1.0)";
     context.strokeStyle = "#fff";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
-  "chonky": (context, rect) => {
+  "chonky": (tower, context, rect) => {
     context.fillStyle = "rgba(255, 0, 255, 1.0)";
     context.strokeStyle = "#fff";
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  }
+};
+
+const unitStyles = {
+  "normal": (unit, context, rect) => {
+    let alpha = unit.health / gameState.unitTypes[unit.type].health;
+    context.fillStyle = "rgba(255, 255, 255, " + alpha + ")";
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
   }
 };
 
@@ -101,7 +113,7 @@ function initCanvas() {
 
 function initInterface() {
   initCanvas();
-  $("#types").empty();
+  $("#towerTypes").empty();
   Object.keys(gameState.towerTypes).forEach((type) => {
     let button = $("<button></button>")
       .text(type)
@@ -109,7 +121,21 @@ function initInterface() {
         clientState.placeType = type;
         drawState();
       });
-    $("#types").append(button);
+    $("#towerTypes").append(button);
+  });
+  $("#unitTypes").empty();
+  Object.keys(gameState.unitTypes).forEach((type) => {
+    let button = $("<button></button>")
+      .text(type)
+      .click(() => {
+        room.send({
+          type: "spawnUnit",
+          value: {
+            type: type
+          }
+        })
+      });
+    $("#unitTypes").append(button);
   });
 }
 
@@ -125,7 +151,15 @@ function drawTower(tower) {
   let rect = getTowerRect(tower);
   let style = towerStyles[tower.type];
   if (style !== undefined) {
-    style(context, rect);
+    style(tower, context, rect);
+  }
+}
+
+function drawUnit(unit) {
+  let rect = getCellRect(unit.position);
+  let style = unitStyles[unit.type];
+  if (style !== undefined) {
+    style(unit, context, rect);
   }
 }
 
@@ -154,16 +188,27 @@ function drawState() {
   }
 
   gameState.towers.forEach(drawTower);
+  gameState.units.forEach(drawUnit);
 
   let currentTower = gameState.getTower(clientState.lastMouse);
   if (currentTower) {
     gameState.getTowerPoses(clientState.lastMouse, currentTower.type).forEach((pos) => {
       drawCell("hoverTower", pos);
     });
+    currentTower.reachable.forEach((pos) => {
+      drawCell("towerRange", pos);
+    });
   } else if (gameState.canPlaceTower(clientState.lastMouse, clientState.placeType)) {
     let type = clientState.canPlaceTowerWithPath(clientState.lastMouse, clientState.placeType) ? "hoverCell" : "error";
     gameState.getTowerPoses(clientState.lastMouse, clientState.placeType).forEach((pos) => {
       drawCell(type, pos);
+    });
+    gameState.towerTypes[clientState.placeType].reachable.map((pos) => {
+      return {x: pos.x + clientState.lastMouse.x, y: pos.y + clientState.lastMouse.y};
+    }).filter((pos) => {
+      return (pos.x >= 0) && (pos.y >= 0) && (pos.x < board.width) && (pos.y < board.height);
+    }).forEach((pos) => {
+      drawCell("towerRange", pos);
     });
   }
 }

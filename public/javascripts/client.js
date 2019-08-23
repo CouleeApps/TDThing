@@ -12,14 +12,15 @@ room.onJoin.add(() => {
 });
 room.onMessage.add((data) => {
   switch (data.type) {
-    case "state":
+    case "setup":
       board.width = data.value.board.width;
       board.height = data.value.board.height;
       gameState.towerTypes = data.value.towerTypes;
+      gameState.unitTypes = data.value.unitTypes;
       clientState.playableRegion = data.value.playableRegion;
+
       board.init();
       gameState.init();
-
       initInterface();
 
       drawState();
@@ -30,7 +31,11 @@ room.onMessage.add((data) => {
     case "board":
       board.cells = data.value.cells;
       board.spawners = data.value.spawners;
+      drawState();
+      break;
+    case "state":
       gameState.towers = data.value.towers;
+      gameState.units = data.value.units;
       drawState();
       break;
   }

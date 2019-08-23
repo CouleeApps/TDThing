@@ -33,6 +33,7 @@ class TDMPRoom extends Colyseus.Room {
 
   onInit(options) {
     console.log("BasicRoom created!", options);
+    setInterval(() => this.tick(50), 50);
   }
 
   onJoin(client) {
@@ -41,7 +42,7 @@ class TDMPRoom extends Colyseus.Room {
     client.isTop = isTop;
     client.clientState = new TDMP.ClientState(this.gameState);
     client.clientState.playableRegion = isTop ? this.topRegion : this.bottomRegion;
-    this.sendState(client);
+    this.sendSetup(client);
     this.sendBoard(client);
   }
 
@@ -55,29 +56,39 @@ class TDMPRoom extends Colyseus.Room {
         this.chat(`(${client.sessionId}) ${data.value}`);
         break;
       case "addTower":
+        if (this.gameState.towerTypes[data.value.type] === undefined)
+          return;
         if (client.clientState.canPlaceTowerWithPath(data.value.origin, data.value.type)) {
           this.gameState.addTower(data.value.origin, data.value.type);
         }
         this.clients.forEach((c) => this.sendBoard(c));
         break;
       case "removeTower":
+        if (this.gameState.towerTypes[data.value.type] === undefined)
+          return;
         if (TDMP.inRect(client.clientState.playableRegion, data.value.origin)) {
           this.gameState.removeTower(data.value.origin);
         }
         this.clients.forEach((c) => this.sendBoard(c));
         break;
+      case "spawnUnit":
+        if (this.gameState.unitTypes[data.value.type] === undefined)
+          return;
+        this.gameState.spawnUnit(client.isTop ? "top" : "bottom", data.value.type);
+        break;
     }
   }
 
-  sendState(client) {
+  sendSetup(client) {
     this.send(client, {
-      type: "state",
+      type: "setup",
       value: {
         board: {
           width: this.board.width,
           height: this.board.height
         },
         towerTypes: this.gameState.towerTypes,
+        unitTypes: this.gameState.unitTypes,
         playableRegion: client.clientState.playableRegion
       }
     });
@@ -89,7 +100,17 @@ class TDMPRoom extends Colyseus.Room {
       value: {
         cells: this.board.cells,
         spawners: this.board.spawners,
+      }
+    });
+    this.sendState(client);
+  }
+
+  sendState(client) {
+    this.send(client, {
+      type: "state",
+      value: {
         towers: this.gameState.towers,
+        units: this.gameState.units,
       }
     });
   }
@@ -105,6 +126,18 @@ class TDMPRoom extends Colyseus.Room {
     });
   }
 
+  tick(deltaMS) {
+    let updates = false;
+    if (this.gameState.moveUnits(deltaMS)) {
+      updates = true;
+    }
+    if (this.gameState.towerAttack(deltaMS)) {
+      updates = true;
+    }
+    if (updates) {
+      this.clients.forEach((c) => this.sendState(c));
+    }
+  }
 }
 
 
