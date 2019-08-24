@@ -7,9 +7,9 @@ room.onJoin.add(() => {
 
   room.state.onChange = (changes) => {
     changes.forEach(change => {
-      console.log(change.field);
-      console.log(change.value);
-      console.log(change.previousValue);
+//       console.log(change.field);
+//       console.log(change.value);
+//       console.log(change.previousValue);
     });
     drawState();
   };

@@ -1,11 +1,14 @@
-const schema = require('@colyseus/schema');
-const Schema = schema.Schema;
-const ArraySchema = schema.ArraySchema;
-const MapSchema = schema.MapSchema;
-const Point = require("./math").Point;
+import {Schema, ArraySchema, MapSchema, type} from "@colyseus/schema";
+import {Point} from "./math";
 
-class Cell extends Schema {
-  constructor(state) {
+export class Cell extends Schema {
+  @type("string")
+  state: string;
+
+  @type("number")
+  tower: number;
+
+  constructor(state: string) {
     super();
 
     this.state = state;
@@ -17,19 +20,22 @@ class Cell extends Schema {
   static spawnerCell() {
     return new Cell("spawner");
   }
-  static towerCell(towerId) {
+  static towerCell(towerId: number) {
     let cell = new Cell("tower");
     cell.tower = towerId;
     return cell;
   }
 }
-schema.defineTypes(Cell, {
-  state: "string",
-  tower: "number"
-});
 
-class Paths extends Schema {
-  constructor(board) {
+export class Paths extends Schema {
+  board: Board;
+  needsUpdate: boolean;
+  @type([ Point ])
+  top: ArraySchema<Point>;
+  @type([ Point ])
+  bottom: ArraySchema<Point>;
+
+  constructor(board: Board) {
     super();
     this.board = board;
 
@@ -38,7 +44,7 @@ class Paths extends Schema {
     this.bottom = new ArraySchema();
   }
 
-  get(fromSide = "top") {
+  get(fromSide: string = "top") {
     if (this.needsUpdate) {
       this._update();
     }
@@ -49,16 +55,16 @@ class Paths extends Schema {
     }
   }
 
-  findPath(start, end) {
-    let toKey = (pos) => pos.x + " " + pos.y;
+  findPath(start: Point, end: Point) {
+    let toKey = (pos: Point) => pos.x + " " + pos.y;
     // BFS!
     let queue = [start];
-    let paths = {};
-    paths[toKey(start)] = [start];
+    let paths = new Map<string, [Point]>();
+    paths.set(toKey(start), [start]);
 
     while (queue.length > 0) {
       let top = queue.shift();
-      if (top === end) {
+      if (top === end || top === undefined) {
         break;
       }
       let neighbors = [
@@ -71,7 +77,7 @@ class Paths extends Schema {
         if (n.x < 0 || n.y < 0 || n.x >= this.board.extent.x || n.y >= this.board.extent.y)
           return false;
         // Searched
-        if (paths[toKey(n)] !== undefined)
+        if (paths.get(toKey(n)) !== undefined)
           return false;
         // Pending
         if (queue.indexOf(n) !== -1)
@@ -82,13 +88,15 @@ class Paths extends Schema {
       });
       neighbors.forEach((n) => {
         queue.push(n);
-        paths[toKey(n)] = [top].concat(paths[toKey(top)]);
+        // @ts-ignore
+        paths.set(toKey(n), [top].concat(paths.get(toKey(top))));
       });
     }
-    if (paths[toKey(end)] === undefined) {
+    if (paths.get(toKey(end)) === undefined) {
       return new ArraySchema();
     } else {
-      return new ArraySchema(end).concat(paths[toKey(end)]);
+      // @ts-ignore
+      return new ArraySchema(end).concat(paths.get(toKey(end))).reverse();
     }
   }
 
@@ -102,13 +110,18 @@ class Paths extends Schema {
     this.bottom = this.findPath(this.board.spawners.bottom, this.board.spawners.top);
   }
 }
-schema.defineTypes(Paths, {
-  top: [ Point ],
-  bottom: [ Point ]
-});
 
-class Board extends Schema {
-  constructor(width, height) {
+export class Board extends Schema {
+  @type(Point)
+  extent: Point;
+  @type([ Cell ])
+  cells: ArraySchema<Cell>;
+  @type({ map: Point })
+  spawners: MapSchema<Point>;
+  @type(Paths)
+  solution: Paths;
+
+  constructor(width: number, height: number) {
     super();
 
     this.extent = new Point(width, height);
@@ -132,15 +145,15 @@ class Board extends Schema {
   }
 
   // Lazy functions
-  getCell(boardPos) {
+  getCell(boardPos: Point) {
     return this.cells[boardPos.x + this.extent.x * boardPos.y];
   }
-  setCell(boardPos, cell) {
+  setCell(boardPos: Point, cell: Cell) {
     this.cells[boardPos.x + this.extent.x * boardPos.y] = cell;
     this.solution.update();
   }
 
-  getSquarePoses(boardPos, extent) {
+  getSquarePoses(boardPos: Point, extent: Point) {
     if (boardPos.x >= this.extent.x - extent.x) {
       boardPos.x = this.extent.x - extent.x;
     }
@@ -161,7 +174,7 @@ class Board extends Schema {
     return poses;
   }
 
-  createSpawners(top, bottom) {
+  createSpawners(top: Point, bottom: Point) {
     this.setCell(new Point(top.x, top.y), Cell.spawnerCell());
     this.setCell(new Point(bottom.x, bottom.y), Cell.spawnerCell());
     this.spawners.top = top;
@@ -173,14 +186,3 @@ class Board extends Schema {
     return this.solution.get(fromSide);
   }
 }
-schema.defineTypes(Board, {
-  extent: Point,
-  spawners: { map: Point },
-  cells: [ Cell ],
-  solution: Paths
-});
-
-module.exports = {
-  Cell: Cell,
-  Board: Board,
-};
