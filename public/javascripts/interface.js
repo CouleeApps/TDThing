@@ -4,46 +4,12 @@ let canvas = $("canvas");
 /* @var CanvasRenderingContext2D context */
 let context = canvas[0].getContext('2d');
 
-class Point {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-  }
-  static from(object) {
-    return new Point(object.x, object.y);
-  }
-  get width() {
-    return this.x;
-  }
-  get height() {
-    return this.y;
-  }
-  set width(x) {
-    this.x = x;
-  }
-  set height(y) {
-    this.y = y;
-  }
-}
-
-function eq(p0, p1) {
-  return p0.x === p1.x && p0.y === p1.y;
-}
-function distSq(p0, p1) {
-  return (p0.x - p1.x) * (p0.x - p1.x) + (p0.y - p1.y) * (p0.y - p1.y);
-}
-function inRect(rect, p) {
-  return p.x >= rect.x && p.y >= rect.y && p.x < rect.x + rect.width && p.y < rect.y + rect.height;
-}
-
-function board() {
-  return gameState().board;
-}
-function gameState() {
-  return room.state.gameState;
-}
-
 const extent = new Point(480, 640);
+
+let interfaceState = {
+  lastMouse: new Point(0, 0),
+  placeType: "normal",
+};
 
 const styles = {
   "hoverCell": (context, rect) => {
@@ -116,34 +82,34 @@ const unitStyles = {
 // Board position -> canvas rect
 function getCellRect(boardPos) {
   return {
-    x: boardPos.x * (extent.width / board().extent.width),
-    y: boardPos.y * (extent.height / board().extent.height),
-    width: (extent.width / board().extent.width),
-    height: (extent.height / board().extent.height)
+    x: boardPos.x * (extent.x / board().extent.x),
+    y: boardPos.y * (extent.y / board().extent.y),
+    width: (extent.x / board().extent.x),
+    height: (extent.y / board().extent.y)
   };
 }
 function getTowerRect(tower) {
   return {
-    x: tower.origin.x * (extent.width / board().extent.width),
-    y: tower.origin.y * (extent.height / board().extent.height),
-    width: tower.extent.x * (extent.width / board().extent.width),
-    height: tower.extent.y * (extent.height / board().extent.height)
+    x: tower.origin.x * (extent.x / board().extent.x),
+    y: tower.origin.y * (extent.y / board().extent.y),
+    width: tower.extent.x * (extent.x / board().extent.x),
+    height: tower.extent.y * (extent.y / board().extent.y)
   };
 }
 // Canvas position -> board position
 function getBoardPos(canvasPos) {
   return new Point(
-    Math.floor(canvasPos.x / (extent.width / board().extent.width)),
-    Math.floor(canvasPos.y / (extent.height / board().extent.height)),
+    Math.floor(canvasPos.x / (extent.x / board().extent.x)),
+    Math.floor(canvasPos.y / (extent.y / board().extent.y)),
   );
 }
 
 function initCanvas() {
-  canvas.width(extent.width);
-  canvas.height(extent.height);
+  canvas.width(extent.x);
+  canvas.height(extent.y);
   canvas.attr({
-    width: extent.width,
-    height: extent.height
+    width: extent.x,
+    height: extent.y
   });
 }
 
@@ -154,7 +120,7 @@ function initInterface() {
     let button = $("<button></button>")
       .text(type)
       .click(() => {
-        clientState.placeType = type;
+        interfaceState.placeType = type;
         drawState();
       });
     $("#towerTypes").append(button);
@@ -201,11 +167,11 @@ function drawUnit(unit) {
 
 function drawCanvas() {
   context.fillStyle = "#000";
-  context.fillRect(0, 0, extent.width, extent.height);
+  context.fillRect(0, 0, extent.x, extent.y);
 
-  for (let y = 0; y < board().extent.height; y++) {
-    for (let x = 0; x < board().extent.width; x++) {
-      let cell = board().cells[x + board().extent.width * y];
+  for (let y = 0; y < board().extent.y; y++) {
+    for (let x = 0; x < board().extent.x; x++) {
+      let cell = getCell(board(), new Point(x, y));
       drawCell(cell.state || "empty", new Point(x, y));
     }
   }
@@ -214,10 +180,10 @@ function drawCanvas() {
 function drawState() {
   drawCanvas();
 
-  for (let y = 0; y < board().extent.height; y ++) {
-    for (let x = 0; x < board().extent.width; x ++) {
+  for (let y = 0; y < board().extent.y; y ++) {
+    for (let x = 0; x < board().extent.x; x ++) {
       let boardPos = new Point(x, y);
-      if (!inRect(clientState.playableRegion, boardPos)) {
+      if (!inRect(clientState().playableRegion, boardPos)) {
         drawCell("opponent", boardPos);
       }
     }
@@ -226,23 +192,23 @@ function drawState() {
   gameState().towers.forEach(drawTower);
   gameState().units.forEach(drawUnit);
 
-  let currentTower = gameState.getTowerByPos(clientState.lastMouse);
+  let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
   if (currentTower) {
-    gameState.getTowerPoses(clientState.lastMouse, currentTower.type).forEach((pos) => {
+    getTowerPoses(gameState(), interfaceState.lastMouse, currentTower.type).forEach((pos) => {
       drawCell("hoverTower", pos);
     });
-    gameState.getTowerReachable(currentTower).forEach((pos) => {
+    getTowerReachable(gameState(), currentTower).forEach((pos) => {
       drawCell("towerRange", pos);
     });
-  } else if (gameState.canPlaceTower(clientState.lastMouse, clientState.placeType)) {
-    let type = clientState.canPlaceTowerWithPath(clientState.lastMouse, clientState.placeType) ? "hoverCell" : "error";
-    gameState.getTowerPoses(clientState.lastMouse, clientState.placeType).forEach((pos) => {
+  } else if (canPlaceTower(gameState(), interfaceState.lastMouse, interfaceState.placeType)) {
+    let type = canPlaceTowerWithPath(clientState(), interfaceState.lastMouse, interfaceState.placeType) ? "hoverCell" : "error";
+    getTowerPoses(gameState(), interfaceState.lastMouse, interfaceState.placeType).forEach((pos) => {
       drawCell(type, pos);
     });
-    gameState().towerTypes[clientState.placeType].reachable.map((pos) => {
-      return new Point(pos.x + clientState.lastMouse.x, pos.y + clientState.lastMouse.y);
+    gameState().towerTypes[interfaceState.placeType].reachable.map((pos) => {
+      return new Point(pos.x + interfaceState.lastMouse.x, pos.y + interfaceState.lastMouse.y);
     }).filter((pos) => {
-      return (pos.x >= 0) && (pos.y >= 0) && (pos.x < board().extent.width) && (pos.y < board().extent.height);
+      return (pos.x >= 0) && (pos.y >= 0) && (pos.x < board().extent.x) && (pos.y < board().extent.y);
     }).forEach((pos) => {
       drawCell("towerRange", pos);
     });
@@ -251,33 +217,33 @@ function drawState() {
 
 canvas.mousemove((e) => {
   let boardPos = getBoardPos(new Point(e.offsetX, e.offsetY));
-  boardPos = gameState.tryBump(boardPos, clientState.placeType);
+  boardPos = tryBump(gameState(), boardPos, interfaceState.placeType);
 
-  if (gameState.canPlaceTower(boardPos, clientState.placeType)) {
+  if (canPlaceTower(gameState(), boardPos, interfaceState.placeType)) {
   } else {
-    let tower = gameState.getTowerByPos(boardPos);
+    let tower = getTowerByPos(gameState(), boardPos);
     if (tower !== null) {
       boardPos = tower.origin;
     }
   }
 
-  clientState.lastMouse = boardPos;
+  interfaceState.lastMouse = boardPos;
   drawState();
 });
 
 canvas.mousedown((e) => {
   let boardPos = getBoardPos(new Point(e.offsetX, e.offsetY));
-  boardPos = gameState.tryBump(boardPos, clientState.placeType);
+  boardPos = tryBump(gameState(), boardPos, interfaceState.placeType);
 
-  let tower = gameState.getTowerByPos(boardPos);
+  let tower = getTowerByPos(gameState(), boardPos);
   if (tower === null) {
-    if (clientState.canPlaceTowerWithPath(clientState.lastMouse, clientState.placeType)) {
+    if (canPlaceTowerWithPath(clientState(), interfaceState.lastMouse, interfaceState.placeType)) {
       //Create Tower
       room.send({
         type: "addTower",
         value: {
           origin: boardPos,
-          type: clientState.placeType
+          type: interfaceState.placeType
         }
       });
     }
@@ -288,12 +254,12 @@ canvas.mousedown((e) => {
       type: "removeTower",
       value: {
         origin: boardPos,
-        type: clientState.placeType
+        type: interfaceState.placeType
       }
     });
   }
 
-  clientState.lastMouse = boardPos;
+  interfaceState.lastMouse = boardPos;
   drawState();
 });
 
@@ -316,7 +282,7 @@ $("#lazyTop").click((e) => {
       type: "addTower",
       value: {
         origin: pos,
-        type: clientState.placeType
+        type: interfaceState.placeType
       }
     });
   });
@@ -330,7 +296,7 @@ $("#lazyBottom").click((e) => {
       type: "addTower",
       value: {
         origin: pos,
-        type: clientState.placeType
+        type: interfaceState.placeType
       }
     });
   });

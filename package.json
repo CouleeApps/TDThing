@@ -15,6 +15,7 @@
     "http-errors": "~1.6.3",
     "morgan": "~1.9.1",
     "node-dev": "^4.0.0",
-    "ws": "^7.1.2"
+    "ws": "^7.1.2",
+    "@colyseus/schema": "latest"
   }
 }
