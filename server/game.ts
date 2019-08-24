@@ -66,7 +66,7 @@ export class GameState extends Schema {
     for (let i = 0; i < this.towers.length; i ++) {
       let tower = this.towers[i];
       let on = tower.cells.some(function(pos) {
-        return eq(pos, boardPos);
+        return pos.equals(boardPos);
       });
       if (on) {
         return tower;
@@ -170,12 +170,12 @@ export class GameState extends Schema {
     this.towers.forEach((tower) => {
       let reaching: Unit[] = [];
       reaching = reaching.concat(this.units).filter((unit) => {
-        return unit.side !== tower.side && tower.reachable.some((pos: Point) => eq(pos, unit.position));
+        return unit.side !== tower.side && tower.reachable.some((pos: Point) => pos.equals(unit.position));
       });
       if (reaching.length > 0) {
         // TODO: Different targeting methods
         reaching.sort((u1, u2) => {
-          return distSq(u1.center, tower.center) - distSq(u2.center, tower.center);
+          return u1.center.distSq(tower.center) - u2.center.distSq(tower.center);
         });
         // Attack one at once
         let unit = reaching[0];
@@ -226,7 +226,7 @@ export class ClientState extends Schema {
       return false;
     }
     let poses = this.gameState.getTowerPoses(boardPos, type);
-    if (poses.some((pos) => !inRect(this.playableRegion, pos))) {
+    if (poses.some((pos) => !this.playableRegion.contains(pos))) {
       return false;
     }
     this.gameState.addTower(boardPos, type, "");
@@ -235,14 +235,4 @@ export class ClientState extends Schema {
     this.gameState.removeTower(boardPos);
     return can;
   }
-}
-
-export function eq(p0: Point, p1: Point) {
-  return p0.x === p1.x && p0.y === p1.y;
-}
-export function distSq(p0: Point, p1: Point) {
-  return (p0.x - p1.x) * (p0.x - p1.x) + (p0.y - p1.y) * (p0.y - p1.y);
-}
-export function inRect(rect: Rect, p: Point) {
-  return p.x >= rect.x && p.y >= rect.y && p.x < rect.x + rect.width && p.y < rect.y + rect.height;
 }

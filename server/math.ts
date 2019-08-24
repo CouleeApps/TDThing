@@ -17,6 +17,12 @@ export class Point extends Schema {
   static from(object: { x: number, y: number }) {
     return new Point(object.x, object.y);
   }
+  equals(other: Point) {
+    return this.x === other.x && this.y === other.y;
+  }
+  distSq(other: Point) {
+    return (this.x - other.x) * (this.x - other.x) + (this.y - other.y) * (this.y - other.y);
+  }
 }
 
 export class Rect extends Schema {
@@ -34,5 +40,9 @@ export class Rect extends Schema {
     this.y = y;
     this.width = width;
     this.height = height;
+  }
+
+  contains(p: Point) {
+    return p.x >= this.x && p.y >= this.y && p.x < this.x + this.width && p.y < this.y + this.height;
   }
 }

@@ -1,6 +1,6 @@
 import {Client, Room} from "colyseus";
 import http from "http";
-import {GameState, ClientState, inRect} from "./game";
+import {GameState, ClientState} from "./game";
 import {Point, Rect} from "./math";
 import {Board} from "./board";
 import {Schema, MapSchema, type} from "@colyseus/schema";
@@ -80,7 +80,7 @@ export class TDMPRoom extends Room {
         if (this.state.gameState.towerTypes[data.value.type] === undefined)
           return;
         // @ts-ignore
-        if (inRect(this.clientMap.get(client).playableRegion, data.value.origin)) {
+        if (this.clientMap.get(client).playableRegion.contains(data.value.origin)) {
           this.state.gameState.removeTower(data.value.origin);
         }
         break;
