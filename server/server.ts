@@ -72,7 +72,7 @@ export class TDMPRoom extends Room {
         if (this.state.gameState.towerTypes[data.value.type] === undefined)
           return;
         // @ts-ignore
-        if (this.clientMap.get(client).canPlaceTowerWithPath(data.value.origin, data.value.type)) {
+        if (this.clientMap.get(client).canPlaceTowerWithPath(Point.from(data.value.origin), data.value.type)) {
           this.state.gameState.addTower(Point.from(data.value.origin), data.value.type, this.isTop(client) ? "top" : "bottom");
         }
         break;
@@ -80,8 +80,8 @@ export class TDMPRoom extends Room {
         if (this.state.gameState.towerTypes[data.value.type] === undefined)
           return;
         // @ts-ignore
-        if (this.clientMap.get(client).playableRegion.contains(data.value.origin)) {
-          this.state.gameState.removeTower(data.value.origin);
+        if (this.clientMap.get(client).playableRegion.contains(Point.from(data.value.origin))) {
+          this.state.gameState.removeTower(Point.from(data.value.origin));
         }
         break;
       case "spawnUnit":

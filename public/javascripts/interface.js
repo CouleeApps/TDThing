@@ -189,8 +189,8 @@ function drawState() {
     }
   }
 
-  gameState().towers.forEach(drawTower);
-  gameState().units.forEach(drawUnit);
+  gameState().towers.filter((tower) => !tower.deleted).forEach(drawTower);
+  gameState().units.filter((tower) => !tower.deleted).forEach(drawUnit);
 
   let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
   if (currentTower) {

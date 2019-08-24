@@ -34,6 +34,7 @@ export class Paths extends Schema {
   top: ArraySchema<Point>;
   @type([ Point ])
   bottom: ArraySchema<Point>;
+  exclude: Point[];
 
   constructor(board: Board) {
     super();
@@ -42,6 +43,8 @@ export class Paths extends Schema {
     this.needsUpdate = false;
     this.top = new ArraySchema();
     this.bottom = new ArraySchema();
+
+    this.exclude = [];
   }
 
   get(fromSide: string = "top") {
@@ -82,6 +85,9 @@ export class Paths extends Schema {
         // Pending
         if (queue.indexOf(n) !== -1)
           return false;
+        // Excluded
+        if (this.exclude.some((pt) => pt.equals(n)))
+          return false;
         // Taken
         let cell = this.board.getCell(n);
         return cell.state === "" || cell.state === "spawner";
@@ -97,6 +103,14 @@ export class Paths extends Schema {
     } else {
       // @ts-ignore
       return new ArraySchema(end).concat(paths.get(toKey(end))).reverse();
+    }
+  }
+
+  setExclude(exclude: Point[]) {
+    if (this.exclude.length !== exclude.length ||
+        this.exclude.some((pt, index) => !exclude[index].equals(pt))) {
+      this.exclude = exclude;
+      this.update();
     }
   }
 
@@ -182,7 +196,8 @@ export class Board extends Schema {
     this.solution.update();
   }
 
-  getSolution(fromSide = "top") {
+  getSolution(fromSide = "top", exclude: Point[] = []) {
+    this.solution.setExclude(exclude);
     return this.solution.get(fromSide);
   }
 }

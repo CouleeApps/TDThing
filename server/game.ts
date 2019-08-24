@@ -59,12 +59,14 @@ export class GameState extends Schema {
   }
 
   getTower(towerId: number) {
-    return this.towers.find((tower) => tower.id === towerId);
+    return this.towers.filter((tower) => !tower.deleted).find((tower) => tower.id === towerId);
   }
 
   getTowerByPos(boardPos: Point) {
     for (let i = 0; i < this.towers.length; i ++) {
       let tower = this.towers[i];
+      if (tower.deleted)
+        continue;
       let on = tower.cells.some(function(pos) {
         return pos.equals(boardPos);
       });
@@ -87,7 +89,10 @@ export class GameState extends Schema {
       tower.cells.forEach((pos: Point) => {
         this.board.setCell(pos, Cell.emptyCell());
       });
-      this.towers.splice(this.towers.indexOf(tower), 1);
+      // TODO: When splice is no longer broken, use it instead of this hack
+      tower.deleted = true;
+      // let index = this.towers.indexOf(tower);
+      // this.towers.splice(index, 1);
     }
   }
 
@@ -118,7 +123,9 @@ export class GameState extends Schema {
   }
 
   destroyUnit(unit: Unit) {
-    this.units.splice(this.units.indexOf(unit), 1);
+    // TODO: Huge hack here too
+    unit.deleted = true;
+    // this.units.splice(this.units.indexOf(unit), 1);
   }
 
   // Returns a list of events that happened
@@ -126,7 +133,7 @@ export class GameState extends Schema {
     let events: any[] = [];
     let topPath = this.board.getSolution("top");
     let bottomPath = this.board.getSolution("bottom");
-    this.units.forEach((unit) => {
+    this.units.filter((tower) => !tower.deleted).forEach((unit) => {
       let path = (unit.side === "top" ? topPath : bottomPath);
       unit.accumulatedMS += deltaMS;
       if (unit.accumulatedMS >= this.unitTypes[unit.type].msPerMove) {
@@ -167,10 +174,10 @@ export class GameState extends Schema {
   // Returns a list of events that happened
   towerAttack(deltaMS: number) {
     let events: any[] = [];
-    this.towers.forEach((tower) => {
+    this.towers.filter((tower) => !tower.deleted).forEach((tower) => {
       let reaching: Unit[] = [];
       reaching = reaching.concat(this.units).filter((unit) => {
-        return unit.side !== tower.side && tower.reachable.some((pos: Point) => pos.equals(unit.position));
+        return !unit.deleted && unit.side !== tower.side && tower.reachable.some((pos: Point) => pos.equals(unit.position));
       });
       if (reaching.length > 0) {
         // TODO: Different targeting methods
@@ -229,10 +236,8 @@ export class ClientState extends Schema {
     if (poses.some((pos) => !this.playableRegion.contains(pos))) {
       return false;
     }
-    this.gameState.addTower(boardPos, type, "");
-    let path = this.gameState.board.getSolution();
+    let path = this.gameState.board.getSolution("top", poses);
     let can = path.length > 0;
-    this.gameState.removeTower(boardPos);
     return can;
   }
 }

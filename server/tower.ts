@@ -22,6 +22,8 @@ export class Tower extends Schema {
   cells: ArraySchema<Point>;
   @type("number")
   health: number;
+  @type("boolean")
+  deleted: boolean;
   reachable: Point[];
   inRange: Unit[];
 
@@ -29,7 +31,7 @@ export class Tower extends Schema {
     super();
     this.gameState = gameState;
 
-    let extent = this.gameState.towerTypes[type].extent.clone();
+    let extent = this.gameState.towerTypes[type].extent;
     let cells = new ArraySchema();
     this.gameState.getTowerPoses(origin, type).forEach((pos: any) => {
       cells.push(pos);
@@ -39,10 +41,11 @@ export class Tower extends Schema {
     this.id = id;
     this.origin = origin;
     this.center = new Point(origin.x + extent.x / 2, origin.y + extent.y / 2);
-    this.extent = extent;
+    this.extent = extent.clone();
     this.side = side;
     this.type = type;
     this.cells = cells;
+    this.deleted = false;
     this.health = this.gameState.towerTypes[type].health;
     this.inRange = [];
     this.reachable = this.gameState.towerTypes[this.type].reachable.map((pos: Point) => {

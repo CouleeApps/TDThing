@@ -48,6 +48,8 @@ function getCell(board, pos) {
 function getTowerByPos(gameState, boardPos) {
   for (let i = 0; i < gameState.towers.length; i ++) {
     let tower = gameState.towers[i];
+    if (tower.deleted)
+      continue;
     let on = tower.cells.some(function(pos) {
       return eq(pos, boardPos);
     });
