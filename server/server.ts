@@ -51,20 +51,29 @@ export class TDMPRoom extends Room {
   }
 
   onJoin(client: Client) {
-    this.chat(`${client.sessionId} joined.`);
+    this.chat("Server", `Player connected.`);
     let isTop = this.clients.length === 0 || !this.isTop(this.clients[0]);
-    this.clientMap.set(client, isTop ? this.state.topState : this.state.bottomState);
+    let state = isTop ? this.state.topState : this.state.bottomState;
+    state.reset();
+    this.clientMap.set(client, state);
     this.sendSetup(client);
   }
 
   onLeave(client: Client) {
-    this.chat(`${ client.sessionId } left.`);
+    this.chat("Server", `${ this.getUsername(client) } left.`);
   }
 
   onMessage(client: Client, data: any) {
     switch (data.type) {
+      case "setUsername": {
+        // @ts-ignore
+        this.clientMap.get(client).username = data.value.username;
+        this.chat("Server", `${ this.getUsername(client) } joined chat.`);
+        break;
+      }
       case "chat": {
-        this.chat(`(${client.sessionId}) ${data.value}`);
+        // @ts-ignore
+        this.chat(this.getUsername(client), data.value.text);
         break;
       }
       case "addTower": {
@@ -114,6 +123,16 @@ export class TDMPRoom extends Room {
     return this.isTop(client) ? "top" : "bottom";
   }
 
+  getUsername(client: Client) {
+    // @ts-ignore
+    let name = this.clientMap.get(client).username;
+    if (name === undefined) {
+      return "Player";
+    } else {
+      return name;
+    }
+  }
+
   sendSetup(client: Client) {
     this.send(client, {
       type: "setup",
@@ -130,10 +149,13 @@ export class TDMPRoom extends Room {
     }
   }
 
-  chat(message: string) {
+  chat(from: string, text: string) {
     this.broadcast({
       type: "chat",
-      value: message
+      value: {
+        from: from,
+        text: text
+      }
     });
   }
 

@@ -88,6 +88,38 @@ function initInterface() {
       selectTower(null);
     }
   });
+  $("#chatEntry").keydown((e) => {
+    if (e.keyCode === 13) {
+      room.send({
+        type: "chat",
+        value: {
+          text: $("#chatEntry").val()
+        }
+      });
+      $("#chatEntry").val("");
+    }
+  });
+  let joinChat = (e) => {
+    let username = $("#chatUsername").val().trim();
+    if (username === "")
+      return;
+
+    room.send({
+      type: "setUsername",
+      value: {
+        username: username
+      }
+    });
+    $("#chatJoin").hide();
+    $("#chatInner").show();
+    $("#chatEntry").focus();
+  };
+  $("#chatJoinButton").click(joinChat);
+  $("#chatUsername").keydown((e) => {
+    if (e.keyCode === 13) {
+      joinChat(e);
+    }
+  });
 }
 
 function selectTower(tower) {
@@ -108,6 +140,22 @@ function selectTower(tower) {
     $(".targetStyle").prop("checked", false).removeAttr("disabled");
     $("#targetStyle-" + tower.targetStyle).prop("checked", true);
   }
+}
+
+function addChatLine(from, text) {
+  $("#chat").append(
+    $("<div/>")
+      .addClass("chatMessage")
+      .append(
+        $("<strong/>")
+          .text(from)
+          .append(":&nbsp;")
+      )
+      .append(
+        $("<span/>")
+          .text(text)
+      )
+  );
 }
 
 canvas.mousemove((e) => {
@@ -154,16 +202,6 @@ canvas.mousedown((e) => {
 
   interfaceState.lastMouse = boardPos;
   drawState();
-});
-
-$(document.body).keydown((e) => {
-  if (e.keyCode === 13) {
-    let path = board().getSolution();
-
-    path.forEach((pos) => {
-      drawCell("path", pos);
-    });
-  }
 });
 
 // Debug only

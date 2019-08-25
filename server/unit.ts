@@ -66,12 +66,12 @@ export class UnitType extends Schema {
   @type("number")
   health: number;
   @type("number")
-  damagePerMS: number;
-  constructor(name: string, msPerMove: number, health: number, damagePerMS: number) {
+  damagePerSecond: number;
+  constructor(name: string, msPerMove: number, health: number, damagePerSecond: number) {
     super();
     this.name = name;
     this.msPerMove = msPerMove;
     this.health = health;
-    this.damagePerMS = damagePerMS;
+    this.damagePerSecond = damagePerSecond;
   }
 }

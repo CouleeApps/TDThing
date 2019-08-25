@@ -7,6 +7,8 @@ import {Schema, ArraySchema, MapSchema, type} from "@colyseus/schema";
 export class ClientState extends Schema {
   gameState: GameState;
   @type("string")
+  username: string | undefined;
+  @type("string")
   side: string;
   @type(Rect)
   playableRegion: Rect;
@@ -19,6 +21,10 @@ export class ClientState extends Schema {
     this.side = side;
     this.playableRegion = region;
     this.health = 100;
+  }
+
+  reset() {
+    this.username = undefined;
   }
 
   // If the player can place a tower, unobstructed, maintaining the path
@@ -46,7 +52,7 @@ export class GameState extends Schema {
   @type({ map: TowerType })
   towerTypes: MapSchema<TowerType>;
   @type({ map: UnitType })
-  unitTypes: MapSchema<TowerType>;
+  unitTypes: MapSchema<UnitType>;
   @type({ map: ClientState })
   clientStates: MapSchema<ClientState>;
   @type([ "string" ])
@@ -66,15 +72,22 @@ export class GameState extends Schema {
         "normal",
         new Point(2, 2),
         100,
-        0.001,
+        1,
         5
       ),
       "chonky": new TowerType(
         "chonky",
         new Point(3, 3),
         400,
-        0.1,
+        10,
         3
+      ),
+      "rangey": new TowerType(
+        "rangey",
+        new Point(2, 2),
+        100,
+        0.6,
+        8
       ),
       // TODO: More of these
     });
@@ -83,13 +96,19 @@ export class GameState extends Schema {
         "normal",
         100,
         25,
-        0.001
+        1
       ),
       "chonky": new UnitType(
         "chonky",
         250,
         100,
-        0.005
+        5
+      ),
+      "speedy": new UnitType(
+        "speedy",
+        60,
+        20,
+        1
       ),
       // TODO: More of these
     });
@@ -256,7 +275,7 @@ export class GameState extends Schema {
         let unit = reaching[0];
         tower.target = unit.id;
 
-        unit.health -= this.towerTypes[tower.type].damagePerMS * deltaMS;
+        unit.health -= this.towerTypes[tower.type].damagePerSecond * deltaMS / 1000;
         events.push({
           type: "towerAttack",
           data: {

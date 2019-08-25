@@ -35,5 +35,35 @@ body {
 #controls {
   display: flex;
   flex-direction: column;
+  width: 300px;
 }
 
+#controls div:last-child {
+  flex-grow: 1;
+}
+
+#chatContainer {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+}
+
+#chatInner {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#chat {
+  flex-grow: 1;
+  word-break: break-word;
+}
+
+#chatEntryBox {
+  display: flex;
+  flex-direction: row;
+}
+
+#chatEntry {
+  flex-grow: 1;
+}

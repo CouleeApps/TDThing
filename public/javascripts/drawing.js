@@ -57,6 +57,12 @@ const towerStyles = {
     context.fillRect(rect.x, rect.y, rect.width, rect.height);
     context.strokeRect(rect.x, rect.y, rect.width, rect.height);
   },
+  "rangey": (tower, context, rect) => {
+    context.fillStyle = "rgba(255, 150, 0, 1.0)";
+    context.strokeStyle = "#fff";
+    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+    context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  },
 };
 
 const unitStyles = {
@@ -70,6 +76,12 @@ const unitStyles = {
     context.fillStyle = "rgba(160, 160, 160, 1.0)";
     context.beginPath();
     context.ellipse(rect.center().x, rect.center().y, rect.width * 0.4, rect.height * 0.4, 0, 0, Math.PI * 2);
+    context.fill();
+  },
+  "speedy": (unit, context, rect) => {
+    context.fillStyle = "rgba(0, 160, 160, 1.0)";
+    context.beginPath();
+    context.ellipse(rect.center().x, rect.center().y, rect.width * 0.2, rect.height * 0.2, 0, 0, Math.PI * 2);
     context.fill();
   },
 };
@@ -171,23 +183,14 @@ function drawState() {
     }
   }
 
+  let attackWidth = 3;
+
   // Drawing layers:
   // - Tower bases on the bottom
   // - Lasers on top of bases
   // - Units on very top
   // TODO: Health bars very top?
   gameState().towers.filter((tower) => !tower.deleted).forEach(drawTower);
-  context.lineWidth = 3;
-  gameState().towers.filter((tower) => !tower.deleted).forEach((tower) => {
-    if (tower.target !== undefined && tower.target !== 0) {
-      let unit = getUnit(tower.target);
-      if (unit !== null) {
-        drawTowerAttack(tower, unit);
-      }
-    }
-  });
-  context.lineWidth = 1;
-  gameState().units.filter((tower) => !tower.deleted).forEach(drawUnit);
 
   let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
   if (currentTower) {
@@ -205,4 +208,15 @@ function drawState() {
     drawTowerRange(interfaceState.selectedTower.center, interfaceState.selectedTower.type);
     drawTower(interfaceState.selectedTower);
   }
+  context.lineWidth = attackWidth;
+  gameState().towers.filter((tower) => !tower.deleted).forEach((tower) => {
+    if (tower.target !== undefined && tower.target !== 0) {
+      let unit = getUnit(tower.target);
+      if (unit !== null) {
+        drawTowerAttack(tower, unit);
+      }
+    }
+  });
+  context.lineWidth = 1;
+  gameState().units.filter((tower) => !tower.deleted).forEach(drawUnit);
 }

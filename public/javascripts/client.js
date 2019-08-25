@@ -40,7 +40,7 @@ room.onMessage.add((data) => {
       drawState();
       break;
     case "chat":
-      console.log("Got message: " + data.value);
+      addChatLine(data.value.from, data.value.text);
       break;
   }
 });
