@@ -85,6 +85,12 @@ export class GameState extends Schema {
         25,
         0.001
       ),
+      "chonky": new UnitType(
+        "chonky",
+        250,
+        100,
+        0.005
+      ),
       // TODO: More of these
     });
     this.targetStyles = new ArraySchema(
@@ -182,9 +188,9 @@ export class GameState extends Schema {
         // TODO: Interpolate? Might do that in interface
         unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
         unit.pathPosition += 1;
-        unit.position = path[unit.pathPosition];
+        unit.position = path[unit.pathPosition].clone();
         if (unit.pathPosition !== path.length - 1) {
-            unit.nextPosition = path[unit.pathPosition + 1];
+            unit.nextPosition = path[unit.pathPosition + 1].clone();
         }
 
         events.push({

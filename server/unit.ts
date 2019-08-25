@@ -17,8 +17,6 @@ export class Unit extends Schema {
   @type(Point)
   extent: Point;
   @type(Point)
-  center: Point;
-  @type(Point)
   origin: Point;
   @type(Point)
   destination: Point;
@@ -39,7 +37,7 @@ export class Unit extends Schema {
 
     // Units are always 1x1
     let extent = new Point(1, 1);
-    let position = path[0];
+    let position = path[0].clone();
 
     this.id = id;
     this.type = type;
@@ -47,13 +45,16 @@ export class Unit extends Schema {
     this.health = this.gameState.unitTypes[type].health;
     this.accumulatedMS = 0;
     this.extent = extent;
-    this.center = new Point(position.x + extent.x / 2, position.y + extent.y / 2);
-    this.origin = position;
-    this.destination = path[path.length - 1];
-    this.position = position;
-    this.nextPosition = path[1];
+    this.origin = position.clone();
+    this.destination = path[path.length - 1].clone();
+    this.position = position.clone();
+    this.nextPosition = path[1].clone();
     this.pathPosition = 0;
     this.deleted = false;
+  }
+
+  get center() {
+    return new Point(this.position.x + this.extent.x / 2, this.position.y + this.extent.y / 2);
   }
 }
 
