@@ -9,6 +9,7 @@ const extent = new Point(480, 640);
 let interfaceState = {
   lastMouse: new Point(0, 0),
   placeType: "normal",
+  selectedTower: null,
 };
 
 const styles = {
@@ -72,55 +73,13 @@ const towerStyles = {
 };
 
 const unitStyles = {
-  "normal": (unit, context, lerp) => {
+  "normal": (unit, context, rect) => {
     context.fillStyle = "rgba(255, 255, 255)";
     context.beginPath();
-    context.ellipse(lerp.center().x, lerp.center().y, lerp.width * 0.25, lerp.height * 0.25, 0, 0, Math.PI * 2);
+    context.ellipse(rect.center().x, rect.center().y, rect.width * 0.25, rect.height * 0.25, 0, 0, Math.PI * 2);
     context.fill();
   }
 };
-
-function stretch() {
-  return new Point(
-    (extent.x / board().extent.x),
-    (extent.y / board().extent.y)
-  );
-}
-
-// Board position -> canvas rect
-function getCellRect(boardPos) {
-  let s = stretch();
-  return new Rect(
-    boardPos.x * s.x,
-    boardPos.y * s.y,
-    s.x,
-    s.y
-  );
-}
-function getTowerRect(tower) {
-  let s = stretch();
-  return new Rect(
-    tower.origin.x * s.x,
-    tower.origin.y * s.y,
-    tower.extent.x * s.x,
-    tower.extent.y * s.y
-  );
-}
-// Canvas position -> board position
-function getBoardPos(canvasPos) {
-  let s = stretch();
-  return new Point(
-    Math.floor(canvasPos.x / s.x),
-    Math.floor(canvasPos.y / s.y),
-  );
-}
-function getCanvasPos(boardPos) {
-  let s = stretch();
-  return new Point(
-    Math.floor(boardPos.x * s.x),
-    Math.floor(boardPos.y * s.y),
-  );
-}
 
 function initCanvas() {
   canvas.width(extent.x);
@@ -156,6 +115,47 @@ function initInterface() {
         })
       });
     $("#unitTypes").append(button);
+  });
+  $("#targetStyles").empty();
+  gameState().targetStyles.forEach((style) => {
+    let id = "targetStyle-" + style;
+    let button = $("<input/>")
+      .attr({
+        type: "radio",
+        id: id,
+        name: "targetStyle",
+        disabled: "disabled"
+      })
+      .addClass("targetStyle")
+      .click(() => {
+        if (interfaceState.selectedTower !== null) {
+          room.send({
+            type: "setTargetStyle",
+            value: {
+              id: interfaceState.selectedTower.id,
+              style: style
+            }
+          })
+        }
+      });
+    let label = $("<label/>")
+      .append(button)
+      .append(style)
+      .attr({for: id});
+    $("#targetStyles")
+      .append(label)
+      .append("<br/>");
+  });
+  $("#destroyTower").click((e) => {
+    if (interfaceState.selectedTower !== null) {
+      room.send({
+        type: "removeTower",
+        value: {
+          id: interfaceState.selectedTower.id,
+        }
+      });
+      interfaceState.selectedTower = null;
+    }
   });
 }
 
@@ -208,20 +208,26 @@ function drawTower(tower) {
   drawHealthBar(rect, healthProp);
 }
 
+function drawTowerAttack(tower, unit) {
+  // Draw a beam from tower to unit
+  let lineStart = getCanvasPos(tower.center);
+  let lineEnd = getUnitDrawRect(unit).center();
+  context.strokeStyle = "rgba(255, 0, 0, 1.0)";
+  context.beginPath();
+  context.moveTo(lineStart.x, lineStart.y);
+  context.lineTo(lineEnd.x, lineEnd.y);
+  context.stroke();
+}
+
 function drawUnit(unit) {
-  let progress = unit.accumulatedMS / gameState().unitTypes[unit.type].msPerMove;
-
-  let start = getCellRect(unit.position);
-  let end = getCellRect(unit.nextPosition);
-  let lerp = Rect.interpolate(start, end, progress);
-
+  let rect = getUnitDrawRect(unit);
   let style = unitStyles[unit.type];
   if (style !== undefined) {
-    style(unit, context, lerp);
+    style(unit, context, rect);
   }
 
   let healthProp = unit.health / gameState().unitTypes[unit.type].health;
-  drawHealthBar(lerp, healthProp);
+  drawHealthBar(rect, healthProp);
 }
 
 function drawCanvas() {
@@ -237,6 +243,7 @@ function drawCanvas() {
 }
 
 function drawState() {
+  context.lineWidth = 1;
   drawCanvas();
 
   for (let y = 0; y < board().extent.y; y ++) {
@@ -248,7 +255,22 @@ function drawState() {
     }
   }
 
+  // Drawing layers:
+  // - Tower bases on the bottom
+  // - Lasers on top of bases
+  // - Units on very top
+  // TODO: Health bars very top?
   gameState().towers.filter((tower) => !tower.deleted).forEach(drawTower);
+  context.lineWidth = 3;
+  gameState().towers.filter((tower) => !tower.deleted).forEach((tower) => {
+    if (tower.target !== undefined && tower.target !== 0) {
+      let unit = getUnit(tower.target);
+      if (unit !== null) {
+        drawTowerAttack(tower, unit);
+      }
+    }
+  });
+  context.lineWidth = 1;
   gameState().units.filter((tower) => !tower.deleted).forEach(drawUnit);
 
   let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
@@ -261,6 +283,31 @@ function drawState() {
       drawCell(type, pos);
     });
     drawTowerRange(interfaceState.lastMouse.add(Point.from(gameState().towerTypes[interfaceState.placeType].extent).scale(0.5)), interfaceState.placeType);
+  }
+
+  if (interfaceState.selectedTower) {
+    drawTowerRange(interfaceState.selectedTower.center, interfaceState.selectedTower.type);
+    drawTower(interfaceState.selectedTower);
+  }
+}
+
+function selectTower(tower) {
+  interfaceState.selectedTower = tower;
+  if (tower === null) {
+    $("#towerStats")
+      .empty()
+      .append(
+        $("<span/>").text("No Selection")
+      );
+    $(".targetStyle").prop("checked", false).attr({disabled: "disabled"});
+  } else {
+    $("#towerStats")
+      .empty()
+      .append(
+        $("<span/>").text("Health: " + tower.health)
+      );
+    $(".targetStyle").prop("checked", false).removeAttr("disabled");
+    $("#targetStyle-" + tower.targetStyle).prop("checked", true);
   }
 }
 
@@ -297,15 +344,13 @@ canvas.mousedown((e) => {
       });
     }
   } else {
-    //Delete Tower
+    //Select Tower
     boardPos = tower.origin;
-    room.send({
-      type: "removeTower",
-      value: {
-        origin: boardPos,
-        type: interfaceState.placeType
-      }
-    });
+    if (tower.side !== side || (interfaceState.selectedTower !== null && interfaceState.selectedTower.id === tower.id)) {
+      selectTower(null);
+    } else {
+      selectTower(tower);
+    }
   }
 
   interfaceState.lastMouse = boardPos;

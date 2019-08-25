@@ -87,6 +87,47 @@ function inRect(rect, p) {
   return p.x >= rect.x && p.y >= rect.y && p.x < rect.x + rect.width && p.y < rect.y + rect.height;
 }
 
+function stretch() {
+  return new Point(
+    (extent.x / board().extent.x),
+    (extent.y / board().extent.y)
+  );
+}
+
+// Board position -> canvas rect
+function getCellRect(boardPos) {
+  let s = stretch();
+  return new Rect(
+    boardPos.x * s.x,
+    boardPos.y * s.y,
+    s.x,
+    s.y
+  );
+}
+function getTowerRect(tower) {
+  let s = stretch();
+  return new Rect(
+    tower.origin.x * s.x,
+    tower.origin.y * s.y,
+    tower.extent.x * s.x,
+    tower.extent.y * s.y
+  );
+}
+// Canvas position -> board position
+function getBoardPos(canvasPos) {
+  let s = stretch();
+  return new Point(
+    Math.floor(canvasPos.x / s.x),
+    Math.floor(canvasPos.y / s.y),
+  );
+}
+function getCanvasPos(boardPos) {
+  let s = stretch();
+  return new Point(
+    Math.floor(boardPos.x * s.x),
+    Math.floor(boardPos.y * s.y),
+  );
+}
 function board() {
   return gameState().board;
 }
@@ -94,11 +135,31 @@ function gameState() {
   return room.state.gameState;
 }
 function clientState() {
-  return room.state.clientStates[isTop ? "top" : "bottom"];
+  return room.state.gameState.clientStates[side];
 }
 
 function getCell(board, pos) {
   return board.cells[pos.x + board.extent.x * pos.y];
+}
+
+function getTower(id) {
+  for (let tower in gameState().towers) {
+    if (tower.deleted)
+      continue;
+    if (tower.id === id)
+      return tower;
+  }
+  return null;
+}
+
+function getUnit(id) {
+  for (let unit of gameState().units) {
+    if (unit.deleted)
+      continue;
+    if (unit.id === id)
+      return unit;
+  }
+  return null;
 }
 
 function getTowerByPos(gameState, boardPos) {
@@ -190,4 +251,14 @@ function canPlaceTowerWithPath(clientState, boardPos, type) {
   // gameState().removeTower(boardPos, type);
   // return can;
   return true;
+}
+
+function getUnitDrawRect(unit) {
+  let progress = unit.accumulatedMS / gameState().unitTypes[unit.type].msPerMove;
+
+  let start = getCellRect(unit.position);
+  let end = getCellRect(unit.nextPosition);
+  let lerp = Rect.interpolate(start, end, progress);
+
+  return lerp;
 }

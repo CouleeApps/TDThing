@@ -4,6 +4,15 @@ import {Cell} from "./board";
 import {GameState} from "./game";
 import {Unit} from "./unit";
 
+export enum TargetStyle {
+  First = "First",
+  Last = "Last",
+  Strongest = "Strongest",
+  Weakest = "Weakest",
+  Nearest = "Nearest",
+  Furthest = "Furthest",
+}
+
 export class Tower extends Schema {
   gameState: GameState;
   @type("number")
@@ -22,6 +31,10 @@ export class Tower extends Schema {
   cells: ArraySchema<Point>;
   @type("number")
   health: number;
+  @type("number")
+  target: number;
+  @type("string")
+  targetStyle: TargetStyle;
   @type("boolean")
   deleted: boolean;
   reachable: Point[];
@@ -46,6 +59,8 @@ export class Tower extends Schema {
     this.type = type;
     this.cells = cells;
     this.deleted = false;
+    this.target = 0;
+    this.targetStyle = TargetStyle.First;
     this.health = this.gameState.towerTypes[type].health;
     this.inRange = [];
     this.reachable = this.gameState.towerTypes[this.type].reachable.map((pos: Point) => {

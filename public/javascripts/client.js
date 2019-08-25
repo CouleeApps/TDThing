@@ -1,5 +1,5 @@
 
-let isTop = false;
+let side = "top";
 let client = new Colyseus.Client('ws://' + window.location.hostname + ':3020');
 let room = client.join("tdmp");
 room.onJoin.add(() => {
@@ -35,7 +35,7 @@ room.onJoin.add(() => {
 room.onMessage.add((data) => {
   switch (data.type) {
     case "setup":
-      isTop = data.value.isTop;
+      side = data.value.side;
       initInterface();
       drawState();
       break;

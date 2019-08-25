@@ -10,8 +10,6 @@ class TDMPState extends Schema {
   gameState: GameState;
   topState: ClientState;
   bottomState: ClientState;
-  @type({ map: ClientState })
-  clientStates: MapSchema<ClientState>;
 
   constructor() {
     super();
@@ -19,7 +17,7 @@ class TDMPState extends Schema {
     this.gameState = new GameState(new Board(25, 33));
     this.topState = new ClientState(this.gameState, "top", new Rect(0, 0, 25, 16));
     this.bottomState = new ClientState(this.gameState, "bottom", new Rect(0, 17, 25, 16));
-    this.clientStates = new MapSchema({
+    this.gameState.clientStates = new MapSchema({
       top: this.topState,
       bottom: this.bottomState
     });
@@ -65,30 +63,41 @@ export class TDMPRoom extends Room {
 
   onMessage(client: Client, data: any) {
     switch (data.type) {
-      case "chat":
+      case "chat": {
         this.chat(`(${client.sessionId}) ${data.value}`);
         break;
-      case "addTower":
+      }
+      case "addTower": {
         if (this.state.gameState.towerTypes[data.value.type] === undefined)
           return;
         // @ts-ignore
         if (this.clientMap.get(client).canPlaceTowerWithPath(Point.from(data.value.origin), data.value.type)) {
-          this.state.gameState.addTower(Point.from(data.value.origin), data.value.type, this.isTop(client) ? "top" : "bottom");
+          this.state.gameState.addTower(Point.from(data.value.origin), data.value.type, this.getSide(client));
         }
         break;
-      case "removeTower":
-        if (this.state.gameState.towerTypes[data.value.type] === undefined)
-          return;
+      }
+      case "removeTower": {
         // @ts-ignore
-        if (this.clientMap.get(client).playableRegion.contains(Point.from(data.value.origin))) {
-          this.state.gameState.removeTower(Point.from(data.value.origin));
+        let tower = this.state.gameState.getTower(data.value.id);
+        if (tower !== undefined && tower.side === this.getSide(client)) {
+          this.state.gameState.removeTower(tower);
         }
         break;
-      case "spawnUnit":
+      }
+      case "setTargetStyle": {
+        let tower = this.state.gameState.getTower(data.value.id);
+        if (tower !== undefined && tower.side === this.getSide(client) &&
+          this.state.gameState.targetStyles.indexOf(data.value.style) !== -1) {
+          tower.targetStyle = data.value.style;
+        }
+        break;
+      }
+      case "spawnUnit": {
         if (this.state.gameState.unitTypes[data.value.type] === undefined)
           return;
-        this.state.gameState.spawnUnit(this.isTop(client) ? "top" : "bottom", data.value.type);
+        this.state.gameState.spawnUnit(this.getSide(client), data.value.type);
         break;
+      }
     }
   }
 
@@ -101,11 +110,15 @@ export class TDMPRoom extends Room {
     }
   }
 
+  getSide(client: Client) {
+    return this.isTop(client) ? "top" : "bottom";
+  }
+
   sendSetup(client: Client) {
     this.send(client, {
       type: "setup",
       value: {
-        isTop: this.isTop(client)
+        side: this.getSide(client)
       }
     });
   }

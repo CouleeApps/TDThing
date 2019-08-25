@@ -1,8 +1,40 @@
 import {Point, Rect} from "./math";
-import {Tower, TowerType} from "./tower";
+import {TargetStyle, Tower, TowerType} from "./tower";
 import {Unit, UnitType} from "./unit";
 import {Board, Cell} from "./board";
 import {Schema, ArraySchema, MapSchema, type} from "@colyseus/schema";
+
+export class ClientState extends Schema {
+  gameState: GameState;
+  @type("string")
+  side: string;
+  @type(Rect)
+  playableRegion: Rect;
+  @type("number")
+  health: number;
+
+  constructor(gameState: GameState, side: string, region: Rect) {
+    super();
+    this.gameState = gameState;
+    this.side = side;
+    this.playableRegion = region;
+    this.health = 100;
+  }
+
+  // If the player can place a tower, unobstructed, maintaining the path
+  canPlaceTowerWithPath(boardPos: Point, type: string) {
+    if (!this.gameState.canPlaceTower(boardPos, type)) {
+      return false;
+    }
+    let poses = this.gameState.getTowerPoses(boardPos, type);
+    if (poses.some((pos) => !this.playableRegion.contains(pos))) {
+      return false;
+    }
+    let path = this.gameState.board.getSolution("top", poses);
+    let can = path.length > 0;
+    return can;
+  }
+}
 
 export class GameState extends Schema {
   @type([ Tower ])
@@ -15,6 +47,10 @@ export class GameState extends Schema {
   towerTypes: MapSchema<TowerType>;
   @type({ map: UnitType })
   unitTypes: MapSchema<TowerType>;
+  @type({ map: ClientState })
+  clientStates: MapSchema<ClientState>;
+  @type([ "string" ])
+  targetStyles: ArraySchema<TargetStyle>;
   lastTowerId: number;
   lastUnitId: number;
 
@@ -23,6 +59,7 @@ export class GameState extends Schema {
     this.towers = new ArraySchema();
     this.units = new ArraySchema();
     this.board = board;
+    this.clientStates = new MapSchema<ClientState>();
 
     this.towerTypes = new MapSchema({
       "normal": new TowerType(
@@ -50,6 +87,14 @@ export class GameState extends Schema {
       ),
       // TODO: More of these
     });
+    this.targetStyles = new ArraySchema(
+      TargetStyle.First,
+      TargetStyle.Last,
+      TargetStyle.Strongest,
+      TargetStyle.Weakest,
+      TargetStyle.Nearest,
+      TargetStyle.Furthest,
+    );
     this.lastTowerId = 1;
     this.lastUnitId = 1;
     this.init();
@@ -83,17 +128,14 @@ export class GameState extends Schema {
     return tower;
   }
 
-  removeTower(boardPos: Point) {
-    let tower = this.getTowerByPos(boardPos);
-    if (tower !== null) {
-      tower.cells.forEach((pos: Point) => {
-        this.board.setCell(pos, Cell.emptyCell());
-      });
-      // TODO: When splice is no longer broken, use it instead of this hack
-      tower.deleted = true;
-      // let index = this.towers.indexOf(tower);
-      // this.towers.splice(index, 1);
-    }
+  removeTower(tower: Tower) {
+    tower.cells.forEach((pos: Point) => {
+      this.board.setCell(pos, Cell.emptyCell());
+    });
+    // TODO: When splice is no longer broken, use it instead of this hack
+    tower.deleted = true;
+    // let index = this.towers.indexOf(tower);
+    // this.towers.splice(index, 1);
   }
 
   getTowerPoses(origin: Point, type: string) {
@@ -183,12 +225,30 @@ export class GameState extends Schema {
         return !unit.deleted && unit.side !== tower.side && tower.reachable.some((pos: Point) => pos.equals(unit.position));
       });
       if (reaching.length > 0) {
-        // TODO: Different targeting methods
-        reaching.sort((u1, u2) => {
-          return u1.center.distSq(tower.center) - u2.center.distSq(tower.center);
-        });
+        switch (tower.targetStyle) {
+          case TargetStyle.First:
+            reaching.sort((u1, u2) => u2.pathPosition - u1.pathPosition);
+            break;
+          case TargetStyle.Last:
+            reaching.sort((u1, u2) => u1.pathPosition - u2.pathPosition);
+            break;
+          case TargetStyle.Strongest:
+            reaching.sort((u1, u2) => u2.health - u1.health);
+            break;
+          case TargetStyle.Weakest:
+            reaching.sort((u1, u2) => u1.health - u2.health);
+            break;
+          case TargetStyle.Nearest:
+            reaching.sort((u1, u2) => u1.center.distSq(tower.center) - u2.center.distSq(tower.center));
+            break;
+          case TargetStyle.Furthest:
+            reaching.sort((u1, u2) => u2.center.distSq(tower.center) - u1.center.distSq(tower.center));
+            break;
+        }
+
         // Attack one at once
         let unit = reaching[0];
+        tower.target = unit.id;
 
         unit.health -= this.towerTypes[tower.type].damagePerMS * deltaMS;
         events.push({
@@ -207,40 +267,10 @@ export class GameState extends Schema {
             }
           });
         }
+      } else {
+        tower.target = 0;
       }
     });
     return events;
-  }
-}
-
-export class ClientState extends Schema {
-  gameState: GameState;
-  @type("string")
-  side: string;
-  @type(Rect)
-  playableRegion: Rect;
-  @type("number")
-  health: number;
-
-  constructor(gameState: GameState, side: string, region: Rect) {
-    super();
-    this.gameState = gameState;
-    this.side = side;
-    this.playableRegion = region;
-    this.health = 100;
-  }
-
-  // If the player can place a tower, unobstructed, maintaining the path
-  canPlaceTowerWithPath(boardPos: Point, type: string) {
-    if (!this.gameState.canPlaceTower(boardPos, type)) {
-      return false;
-    }
-    let poses = this.gameState.getTowerPoses(boardPos, type);
-    if (poses.some((pos) => !this.playableRegion.contains(pos))) {
-      return false;
-    }
-    let path = this.gameState.board.getSolution("top", poses);
-    let can = path.length > 0;
-    return can;
   }
 }
