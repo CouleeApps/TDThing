@@ -45,14 +45,14 @@ export class TDMPRoom extends Room {
     this.state.board.createSpawners(new Point(12, 0), new Point(12, this.state.board.extent.y - 1));
   }
 
-  onInit(options: any) {
+  onCreate(options: any) {
     console.log("BasicRoom created!", options);
     this.tickSchedule = setInterval(() => this.tick(50), 50);
   }
 
   onJoin(client: Client) {
     this.chat("Server", `Player connected.`);
-    let isTop = this.clients.length === 0 || !this.isTop(this.clients[0]);
+    let isTop = this.clientMap.size === 0 || !this.isTop(this.clientMap.keys().next().value);
     let state = isTop ? this.state.topState : this.state.bottomState;
     state.reset();
     this.clientMap.set(client, state);
@@ -61,6 +61,7 @@ export class TDMPRoom extends Room {
 
   onLeave(client: Client) {
     this.chat("Server", `${ this.getUsername(client) } left.`);
+    this.clientMap.delete(client);
   }
 
   onMessage(client: Client, data: any) {

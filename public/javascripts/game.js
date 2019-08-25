@@ -132,10 +132,10 @@ function board() {
   return gameState().board;
 }
 function gameState() {
-  return room.state.gameState;
+  return connectionState.room.state.gameState;
 }
 function clientState() {
-  return room.state.gameState.clientStates[side];
+  return gameState().clientStates[side];
 }
 
 function getCell(board, pos) {

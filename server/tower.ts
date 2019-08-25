@@ -46,13 +46,13 @@ export class Tower extends Schema {
 
     let extent = this.gameState.towerTypes[type].extent;
     let cells = new ArraySchema();
-    this.gameState.getTowerPoses(origin, type).forEach((pos: any) => {
-      cells.push(pos);
+    this.gameState.getTowerPoses(origin, type).forEach((pos: Point) => {
+      cells.push(pos.clone());
       this.gameState.board.setCell(pos, Cell.towerCell(id));
     });
 
     this.id = id;
-    this.origin = origin;
+    this.origin = origin.clone();
     this.center = new Point(origin.x + extent.x / 2, origin.y + extent.y / 2);
     this.extent = extent.clone();
     this.side = side;

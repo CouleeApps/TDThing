@@ -1,52 +1,43 @@
 
 let side = "top";
 let client = new Colyseus.Client('ws://' + window.location.hostname + ':3020');
-let room = client.join("tdmp");
-room.onJoin.add(() => {
-  console.log(client.id, "joined", room.name);
+let connectionState = {
+  room: null,
+  initialized: false
+};
 
-  room.state.onChange = (changes) => {
-    changes.forEach(change => {
-//       console.log(change.field);
-//       console.log(change.value);
-//       console.log(change.previousValue);
-    });
+function send(message) {
+  return connectionState.room.send(message);
+}
+
+client.joinOrCreate("tdmp", {}).then((room) => {
+  connectionState.room = room;
+  console.log("Room Id:", room.sessionId);
+
+  room.onStateChange.once((state) => {
+    console.log(state);
+    initInterface();
+  });
+  room.onStateChange((state) => {
     drawState();
-  };
-  room.state.gameState.towers.onAdd = (item, index) => {
-    console.log(item, "has been added at", index);
+  });
 
-    // add your player entity to the game world!
-    // If you want to track changes on a child object inside a map, this is a common pattern:
-    item.onChange = function(changes) {
-      changes.forEach(change => {
-        console.log(change.field);
-        console.log(change.value);
-        console.log(change.previousValue);
-      })
-    };
-
-    // force "onChange" to be called immediately
-    item.triggerAll();
-
-    drawState();
-  };
-});
-room.onMessage.add((data) => {
-  switch (data.type) {
-    case "setup":
-      side = data.value.side;
-      initInterface();
-      drawState();
-      break;
-    case "chat":
-      addChatLine(data.value.from, data.value.text);
-      break;
-  }
+  room.onMessage((data) => {
+    switch (data.type) {
+      case "setup":
+        side = data.value.side;
+        break;
+      case "chat":
+        addChatLine(data.value.from, data.value.text);
+        break;
+    }
+  });
+}).catch((e) => {
+  console.error("Join Error: ", e);
 });
 
 function chat(message) {
-  room.send({
+  send({
     type: "chat",
     value: message
   })

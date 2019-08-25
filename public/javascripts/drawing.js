@@ -88,7 +88,7 @@ const unitStyles = {
 
 
 function drawHealthBar(rect, healthProp) {
-  let healthBarSize = 4;
+  let healthBarSize = 4 * dpi;
 
   context.fillStyle = "rgba(0, 255, 0, 1.0)";
   context.beginPath();
@@ -183,7 +183,7 @@ function drawState() {
     }
   }
 
-  let attackWidth = 3;
+  let attackWidth = 3 * dpi;
 
   // Drawing layers:
   // - Tower bases on the bottom

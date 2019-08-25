@@ -7,6 +7,7 @@ var liveReload = require("easy-livereload");
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+var cors = require("cors");
 var http = require('http');
 var colyseus = require('colyseus');
 var TDMPRoom = require('./server/server').TDMPRoom;
@@ -51,6 +52,19 @@ app.use(liveReload({
   },
 }));
 
+app.use(cors({
+  origin: ["http://localhost:3000", "http://localhost:3020"]
+}));
+const server = http.createServer(app);
+
+let gameServer = new colyseus.Server({
+  server: server,
+  express: app
+});
+
+gameServer.define("tdmp", TDMPRoom);
+gameServer.listen(3020, "0.0.0.0");
+
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
@@ -69,20 +83,5 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
-
-app.use(function(app) {
-  const server = http.createServer(app);
-
-  let gameServer = new colyseus.Server({
-    server
-  });
-
-  gameServer.register("tdmp", TDMPRoom);
-  gameServer.listen(3020, "0.0.0.0");
-
-  return function (req, res, next) {
-
-  };
-}(app));
 
 module.exports = app;
