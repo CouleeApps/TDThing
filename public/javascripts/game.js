@@ -144,8 +144,6 @@ function getCell(board, pos) {
 
 function getTower(id) {
   for (let tower in gameState().towers) {
-    if (tower.deleted)
-      continue;
     if (tower.id === id)
       return tower;
   }
@@ -154,8 +152,6 @@ function getTower(id) {
 
 function getUnit(id) {
   for (let unit of gameState().units) {
-    if (unit.deleted)
-      continue;
     if (unit.id === id)
       return unit;
   }
@@ -165,8 +161,6 @@ function getUnit(id) {
 function getTowerByPos(gameState, boardPos) {
   for (let i = 0; i < gameState.towers.length; i ++) {
     let tower = gameState.towers[i];
-    if (tower.deleted)
-      continue;
     let on = tower.cells.some(function(pos) {
       return eq(pos, boardPos);
     });
