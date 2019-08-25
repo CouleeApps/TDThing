@@ -198,6 +198,6 @@ export class Board extends Schema {
 
   getSolution(fromSide = "top", exclude: Point[] = []) {
     this.solution.setExclude(exclude);
-    return this.solution.get(fromSide);
+    return this.solution.get(fromSide).map((pt) => pt.clone());
   }
 }

@@ -141,6 +141,9 @@ export class GameState extends Schema {
         unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
         unit.pathPosition += 1;
         unit.position = path[unit.pathPosition];
+        if (unit.pathPosition !== path.length - 1) {
+            unit.nextPosition = path[unit.pathPosition + 1];
+        }
 
         events.push({
           type: "unitMove",
@@ -149,7 +152,7 @@ export class GameState extends Schema {
           }
         });
 
-        if (unit.position === unit.destination || unit.pathPosition >= path.length) {
+        if (unit.position === unit.destination || unit.pathPosition >= path.length - 1) {
           // TODO: Damage to base
           this.destroyUnit(unit);
           events.push({

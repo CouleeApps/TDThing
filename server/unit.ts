@@ -24,6 +24,8 @@ export class Unit extends Schema {
   destination: Point;
   @type(Point)
   position: Point;
+  @type(Point)
+  nextPosition: Point;
   @type("number")
   pathPosition: number;
   @type("boolean")
@@ -49,6 +51,7 @@ export class Unit extends Schema {
     this.origin = position;
     this.destination = path[path.length - 1];
     this.position = position;
+    this.nextPosition = path[1];
     this.pathPosition = 0;
     this.deleted = false;
   }

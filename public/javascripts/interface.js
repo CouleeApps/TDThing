@@ -72,35 +72,53 @@ const towerStyles = {
 };
 
 const unitStyles = {
-  "normal": (unit, context, rect) => {
-    let alpha = unit.health / gameState().unitTypes[unit.type].health;
-    context.fillStyle = "rgba(255, 255, 255, " + alpha + ")";
-    context.fillRect(rect.x, rect.y, rect.width, rect.height);
+  "normal": (unit, context, lerp) => {
+    context.fillStyle = "rgba(255, 255, 255)";
+    context.beginPath();
+    context.ellipse(lerp.center().x, lerp.center().y, lerp.width * 0.25, lerp.height * 0.25, 0, 0, Math.PI * 2);
+    context.fill();
   }
 };
 
+function stretch() {
+  return new Point(
+    (extent.x / board().extent.x),
+    (extent.y / board().extent.y)
+  );
+}
+
 // Board position -> canvas rect
 function getCellRect(boardPos) {
-  return {
-    x: boardPos.x * (extent.x / board().extent.x),
-    y: boardPos.y * (extent.y / board().extent.y),
-    width: (extent.x / board().extent.x),
-    height: (extent.y / board().extent.y)
-  };
+  let s = stretch();
+  return new Rect(
+    boardPos.x * s.x,
+    boardPos.y * s.y,
+    s.x,
+    s.y
+  );
 }
 function getTowerRect(tower) {
-  return {
-    x: tower.origin.x * (extent.x / board().extent.x),
-    y: tower.origin.y * (extent.y / board().extent.y),
-    width: tower.extent.x * (extent.x / board().extent.x),
-    height: tower.extent.y * (extent.y / board().extent.y)
-  };
+  let s = stretch();
+  return new Rect(
+    tower.origin.x * s.x,
+    tower.origin.y * s.y,
+    tower.extent.x * s.x,
+    tower.extent.y * s.y
+  );
 }
 // Canvas position -> board position
 function getBoardPos(canvasPos) {
+  let s = stretch();
   return new Point(
-    Math.floor(canvasPos.x / (extent.x / board().extent.x)),
-    Math.floor(canvasPos.y / (extent.y / board().extent.y)),
+    Math.floor(canvasPos.x / s.x),
+    Math.floor(canvasPos.y / s.y),
+  );
+}
+function getCanvasPos(boardPos) {
+  let s = stretch();
+  return new Point(
+    Math.floor(boardPos.x * s.x),
+    Math.floor(boardPos.y * s.y),
   );
 }
 
@@ -141,6 +159,24 @@ function initInterface() {
   });
 }
 
+function drawHealthBar(rect, healthProp) {
+  let healthBarSize = 4;
+
+  context.fillStyle = "rgba(0, 255, 0, 1.0)";
+  context.beginPath();
+  context.rect(rect.x, rect.y + rect.height - healthBarSize, rect.width * healthProp, healthBarSize);
+  context.fill();
+  context.fillStyle = "rgba(255, 0, 0, 1.0)";
+  context.beginPath();
+  context.rect(rect.x + rect.width * healthProp, rect.y + rect.height - healthBarSize, rect.width - rect.width * healthProp, healthBarSize);
+  context.fill();
+  let border = rect.inset(1);
+  context.strokeStyle = "rgba(0, 0, 0, 1.0)";
+  context.beginPath();
+  context.rect(border.x, border.y + border.height - healthBarSize, border.width, healthBarSize);
+  context.stroke();
+}
+
 function drawCell(state, boardPos) {
   let rect = getCellRect(boardPos);
   let style = styles[state];
@@ -149,20 +185,43 @@ function drawCell(state, boardPos) {
   }
 }
 
+function drawTowerRange(center, type) {
+  context.fillStyle = "rgba(255, 255, 255, 0.3)";
+  context.strokeStyle = "#fff";
+  context.beginPath();
+  let canvasCenter = getCanvasPos(center);
+  let range = gameState().towerTypes[type].range;
+  let s = stretch();
+  context.ellipse(canvasCenter.x, canvasCenter.y, range * s.x, range * s.y, 0, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+}
+
 function drawTower(tower) {
   let rect = getTowerRect(tower);
   let style = towerStyles[tower.type];
   if (style !== undefined) {
     style(tower, context, rect);
   }
+
+  let healthProp = tower.health / gameState().towerTypes[tower.type].health;
+  drawHealthBar(rect, healthProp);
 }
 
 function drawUnit(unit) {
-  let rect = getCellRect(unit.position);
+  let progress = unit.accumulatedMS / gameState().unitTypes[unit.type].msPerMove;
+
+  let start = getCellRect(unit.position);
+  let end = getCellRect(unit.nextPosition);
+  let lerp = Rect.interpolate(start, end, progress);
+
   let style = unitStyles[unit.type];
   if (style !== undefined) {
-    style(unit, context, rect);
+    style(unit, context, lerp);
   }
+
+  let healthProp = unit.health / gameState().unitTypes[unit.type].health;
+  drawHealthBar(lerp, healthProp);
 }
 
 function drawCanvas() {
@@ -194,24 +253,14 @@ function drawState() {
 
   let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
   if (currentTower) {
-    getTowerPoses(gameState(), interfaceState.lastMouse, currentTower.type).forEach((pos) => {
-      drawCell("hoverTower", pos);
-    });
-    getTowerReachable(gameState(), currentTower).forEach((pos) => {
-      drawCell("towerRange", pos);
-    });
+    drawTowerRange(currentTower.center, currentTower.type);
+    drawTower(currentTower);
   } else if (canPlaceTower(gameState(), interfaceState.lastMouse, interfaceState.placeType)) {
     let type = canPlaceTowerWithPath(clientState(), interfaceState.lastMouse, interfaceState.placeType) ? "hoverCell" : "error";
     getTowerPoses(gameState(), interfaceState.lastMouse, interfaceState.placeType).forEach((pos) => {
       drawCell(type, pos);
     });
-    gameState().towerTypes[interfaceState.placeType].reachable.map((pos) => {
-      return new Point(pos.x + interfaceState.lastMouse.x, pos.y + interfaceState.lastMouse.y);
-    }).filter((pos) => {
-      return (pos.x >= 0) && (pos.y >= 0) && (pos.x < board().extent.x) && (pos.y < board().extent.y);
-    }).forEach((pos) => {
-      drawCell("towerRange", pos);
-    });
+    drawTowerRange(interfaceState.lastMouse.add(Point.from(gameState().towerTypes[interfaceState.placeType].extent).scale(0.5)), interfaceState.placeType);
   }
 }
 
