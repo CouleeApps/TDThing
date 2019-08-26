@@ -190,7 +190,7 @@ function drawState() {
   // - Lasers on top of bases
   // - Units on very top
   // TODO: Health bars very top?
-  gameState().towers.forEach(drawTower);
+  gameState().towers.filter((tower) => !tower.deleted).forEach(drawTower);
 
   let currentTower = getTowerByPos(gameState(), interfaceState.lastMouse);
   if (currentTower) {
@@ -209,7 +209,7 @@ function drawState() {
     drawTower(interfaceState.selectedTower);
   }
   context.lineWidth = attackWidth;
-  gameState().towers.forEach((tower) => {
+  gameState().towers.filter((tower) => !tower.deleted).forEach((tower) => {
     if (tower.target !== undefined && tower.target !== 0) {
       let unit = getUnit(tower.target);
       if (unit !== null) {
@@ -218,5 +218,5 @@ function drawState() {
     }
   });
   context.lineWidth = 1;
-  gameState().units.forEach(drawUnit);
+  gameState().units.filter((tower) => !tower.deleted).forEach(drawUnit);
 }

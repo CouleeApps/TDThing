@@ -35,6 +35,8 @@ export class Tower extends Schema {
   target: number;
   @type("string")
   targetStyle: TargetStyle;
+  @type("boolean")
+  deleted: boolean;
   reachable: Point[];
   inRange: Unit[];
 
@@ -56,6 +58,7 @@ export class Tower extends Schema {
     this.side = side;
     this.type = type;
     this.cells = cells;
+    this.deleted = false;
     this.target = 0;
     this.targetStyle = TargetStyle.First;
     this.health = this.gameState.towerTypes[type].health;

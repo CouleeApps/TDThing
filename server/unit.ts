@@ -27,6 +27,8 @@ export class Unit extends Schema {
   path: Point[];
   @type("number")
   pathPosition: number;
+  @type("boolean")
+  deleted: boolean;
 
   constructor(gameState: GameState, id: number, side: string, type: string) {
     super();
@@ -50,6 +52,7 @@ export class Unit extends Schema {
     this.nextPosition = path[1].clone();
     this.path = path;
     this.pathPosition = 0;
+    this.deleted = false;
   }
 
   updatePath() {
