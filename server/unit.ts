@@ -24,6 +24,7 @@ export class Unit extends Schema {
   position: Point;
   @type(Point)
   nextPosition: Point;
+  path: Point[];
   @type("number")
   pathPosition: number;
 
@@ -47,7 +48,13 @@ export class Unit extends Schema {
     this.destination = path[path.length - 1].clone();
     this.position = position.clone();
     this.nextPosition = path[1].clone();
+    this.path = path;
     this.pathPosition = 0;
+  }
+
+  updatePath() {
+    let path = this.gameState.board.solution.findPath(this.nextPosition, this.destination);
+    this.path = this.path.slice(0, this.pathPosition + 1).concat(path);
   }
 
   get center() {

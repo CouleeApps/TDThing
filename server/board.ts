@@ -1,5 +1,6 @@
 import {Schema, ArraySchema, MapSchema, type} from "@colyseus/schema";
 import {Point} from "./math";
+import TinyQueue from "tinyqueue";
 
 export class Cell extends Schema {
   @type("string")
@@ -61,12 +62,14 @@ export class Paths extends Schema {
   findPath(start: Point, end: Point) {
     let toKey = (pos: Point) => pos.x + " " + pos.y;
     // BFS!
-    let queue = [start];
+    let queue = new TinyQueue([start], (a, b) => {
+      return a.distSq(end) - b.distSq(end);
+    });
     let paths = new Map<string, [Point]>();
     paths.set(toKey(start), [start]);
 
     while (queue.length > 0) {
-      let top = queue.shift();
+      let top = queue.pop();
       if (top === end || top === undefined) {
         break;
       }
@@ -81,9 +84,6 @@ export class Paths extends Schema {
           return false;
         // Searched
         if (paths.get(toKey(n)) !== undefined)
-          return false;
-        // Pending
-        if (queue.indexOf(n) !== -1)
           return false;
         // Excluded
         if (this.exclude.some((pt) => pt.equals(n)))

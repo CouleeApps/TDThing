@@ -192,18 +192,15 @@ export class GameState extends Schema {
   // Returns a list of events that happened
   moveUnits(deltaMS: number) {
     let events: any[] = [];
-    let topPath = this.board.getSolution("top");
-    let bottomPath = this.board.getSolution("bottom");
     this.units.forEach((unit) => {
-      let path = (unit.side === "top" ? topPath : bottomPath);
       unit.accumulatedMS += deltaMS;
       if (unit.accumulatedMS >= this.unitTypes[unit.type].msPerMove) {
         // TODO: Interpolate? Might do that in interface
         unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
         unit.pathPosition += 1;
-        unit.position = path[unit.pathPosition].clone();
-        if (unit.pathPosition !== path.length - 1) {
-            unit.nextPosition = path[unit.pathPosition + 1].clone();
+        unit.position = unit.path[unit.pathPosition].clone();
+        if (unit.pathPosition !== unit.path.length - 1) {
+            unit.nextPosition = unit.path[unit.pathPosition + 1].clone();
         }
 
         events.push({
@@ -213,7 +210,7 @@ export class GameState extends Schema {
           }
         });
 
-        if (unit.position === unit.destination || unit.pathPosition >= path.length - 1) {
+        if (unit.position === unit.destination || unit.pathPosition >= unit.path.length - 1) {
           // TODO: Damage to base
           this.destroyUnit(unit);
           events.push({
@@ -270,8 +267,9 @@ export class GameState extends Schema {
         tower.target = unit.id;
 
         unit.health -= this.towerTypes[tower.type].damagePerSecond * deltaMS / 1000;
+        tower.health -= this.unitTypes[unit.type].damagePerSecond * deltaMS / 1000;
         events.push({
-          type: "towerAttack",
+          type: "attack",
           data: {
             tower: tower.id,
             unit: unit.id
@@ -290,6 +288,25 @@ export class GameState extends Schema {
         tower.target = 0;
       }
     });
+    let updatePaths = false;
+    for (let i = 0; i < this.towers.length; i ++) {
+      let tower = this.towers[i];
+
+      if (tower.health <= 0) {
+        this.removeTower(tower);
+        events.push({
+          type: "towerDestroy",
+          data: {
+            tower: tower
+          }
+        });
+        i --;
+        updatePaths = true;
+      }
+    }
+    if (updatePaths) {
+      this.units.forEach((unit) => unit.updatePath());
+    }
     return events;
   }
 }

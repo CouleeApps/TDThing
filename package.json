@@ -19,6 +19,7 @@
     "morgan": "~1.9.1",
     "node-dev": "^4.0.0",
     "typescript": "^3.5.3",
-    "ws": "^7.1.2"
+    "ws": "^7.1.2",
+    "tinyqueue": "latest"
   }
 }
