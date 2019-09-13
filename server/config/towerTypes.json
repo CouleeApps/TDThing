@@ -1,0 +1,26 @@
+[
+  {
+    "name": "normal",
+    "extent": [2, 2],
+    "health": 100,
+    "damagePerSecond": 1,
+    "range": 5,
+    "cost": 10
+  },
+  {
+    "name": "chonky",
+    "extent": [3, 3],
+    "health": 400,
+    "damagePerSecond": 10,
+    "range": 3,
+    "cost": 50
+  },
+  {
+    "name": "rangey",
+    "extent": [2, 2],
+    "health": 100,
+    "damagePerSecond": 0.6,
+    "range": 8,
+    "cost": 30
+  }
+]

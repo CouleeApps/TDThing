@@ -3,6 +3,7 @@ import {TargetStyle, Tower, TowerType} from "./tower";
 import {Unit, UnitType} from "./unit";
 import {Board, Cell} from "./board";
 import {ArraySchema, MapSchema, Schema, type} from "@colyseus/schema";
+import * as fs from "fs";
 
 export class ClientState extends Schema {
   gameState: GameState;
@@ -29,7 +30,7 @@ export class ClientState extends Schema {
     this.health = 100;
     this.money = 200;
     this.ready = false;
-    this.unitQueue = new ArraySchema();
+    this.unitQueue = new ArraySchema<string>();
   }
 
   reset() {
@@ -98,57 +99,20 @@ export class GameState extends Schema {
     this.clientStates = new MapSchema<ClientState>();
     this.roundState = RoundState.Waiting;
 
-    this.towerTypes = new MapSchema({
-      "normal": new TowerType(
-        "normal",
-        new Point(2, 2),
-        100,
-        1,
-        5,
-        10
-      ),
-      "chonky": new TowerType(
-        "chonky",
-        new Point(3, 3),
-        400,
-        10,
-        3,
-        50
-      ),
-      "rangey": new TowerType(
-        "rangey",
-        new Point(2, 2),
-        100,
-        0.6,
-        8,
-        30
-      ),
-      // TODO: More of these
+    this.towerTypes = new MapSchema();
+    let towerConts = fs.readFileSync('server/config/towerTypes.json');
+    let towerTypes = JSON.parse(towerConts.toString()) as [any];
+    towerTypes.forEach((type) => {
+      this.towerTypes[type["name"]] = new TowerType(type);
     });
-    this.unitTypes = new MapSchema({
-      "normal": new UnitType(
-        "normal",
-        100,
-        25,
-        1,
-        3
-      ),
-      "chonky": new UnitType(
-        "chonky",
-        250,
-        100,
-        5,
-        15
-      ),
-      "speedy": new UnitType(
-        "speedy",
-        60,
-        20,
-        1,
-        10
-      ),
-      // TODO: More of these
+
+    this.unitTypes = new MapSchema();
+    let unitConts = fs.readFileSync('server/config/unitTypes.json');
+    let unitTypes = JSON.parse(unitConts.toString()) as [any];
+    unitTypes.forEach((type) => {
+      this.unitTypes[type["name"]] = new UnitType(type);
     });
+
     this.targetStyles = new ArraySchema(
       TargetStyle.First,
       TargetStyle.Last,
@@ -255,7 +219,7 @@ export class GameState extends Schema {
           this.spawnUnit(side, type);
         }, index * 500);
       });
-      this.clientStates[side].unitQueue.splice(0, this.clientStates[side].unitQueue);
+      this.clientStates[side].unitQueue.splice(0);
     };
     startSide("top");
     startSide("bottom");

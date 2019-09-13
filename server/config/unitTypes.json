@@ -1,0 +1,23 @@
+[
+  {
+    "name": "normal",
+    "msPerMove": 100,
+    "health": 25,
+    "damagePerSecond": 1,
+    "cost": 3
+  },
+  {
+    "name": "chonky",
+    "msPerMove": 250,
+    "health": 100,
+    "damagePerSecond": 5,
+    "cost": 15
+  },
+  {
+    "name": "speedy",
+    "msPerMove": 60,
+    "health": 20,
+    "damagePerSecond": 1,
+    "cost": 10
+  }
+]
