@@ -67,3 +67,19 @@ body {
 #chatEntry {
   flex-grow: 1;
 }
+
+#targetStyles {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+#targetStyles label {
+  flex-basis: 26%;
+  flex-grow: 1;
+}
+
+#unitQueue {
+  overflow-y: scroll;
+  max-height: 100px;
+}

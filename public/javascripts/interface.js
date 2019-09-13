@@ -24,9 +24,18 @@ function initCanvas() {
 
 function initInterface() {
   initCanvas();
-  $("#towerTypes").empty();
+  $("#towerTypes")
+    .empty()
+    .append(
+      $("<button/>")
+        .text("None")
+        .click(() => {
+          interfaceState.placeType = null;
+          drawState();
+        })
+    );
   Object.keys(gameState().towerTypes).forEach((type) => {
-    let button = $("<button></button>")
+    let button = $("<button/>")
       .text(type)
       .click(() => {
         interfaceState.placeType = type;
@@ -36,11 +45,11 @@ function initInterface() {
   });
   $("#unitTypes").empty();
   Object.keys(gameState().unitTypes).forEach((type) => {
-    let button = $("<button></button>")
+    let button = $("<button/>")
       .text(type)
       .click(() => {
         send({
-          type: "spawnUnit",
+          type: "queueUnit",
           value: {
             type: type
           }
@@ -89,6 +98,16 @@ function initInterface() {
       selectTower(null);
     }
   });
+  $("#readyButton").click((e) => {
+    send({
+      type: "ready",
+      value: {}
+    });
+  });
+  initChatInterface();
+}
+
+function initChatInterface() {
   $("#chatEntry").keydown((e) => {
     if (e.keyCode === 13) {
       send({
@@ -120,6 +139,34 @@ function initInterface() {
     if (e.keyCode === 13) {
       joinChat(e);
     }
+  });
+}
+
+function updateInterface() {
+  $("#money").text("Money: " + clientState().money);
+
+  let isConstructing = gameState().roundState === "Constructing" && !clientState().ready;
+  if (isConstructing) {
+    $(".constructModeOnly").show();
+  } else {
+    $(".constructModeOnly").hide();
+  }
+
+  $("#unitQueue").empty();
+
+  clientState().unitQueue.reduce((prev, current) => {
+    if (prev.length === 0) {
+      return [[current, 1]];
+    } else if (prev[prev.length - 1][0] === current) {
+      return prev.slice(0, prev.length - 1).concat([[current, prev[prev.length - 1][1] + 1]]);
+    } else {
+      return prev.concat([[current, 1]]);
+    }
+  }, []).forEach((unit) => {
+    $("#unitQueue").append(
+      $("<div/>")
+        .text(unit[0] + " x " + unit[1])
+    )
   });
 }
 
@@ -160,36 +207,39 @@ function addChatLine(from, text) {
 }
 
 canvas.mousemove((e) => {
-  let boardPos = getBoardPos(new Point(e.offsetX * dpi, e.offsetY * dpi));
-  boardPos = tryBump(gameState(), boardPos, interfaceState.placeType);
+  if (interfaceState.placeType !== null) {
+    let boardPos = getBoardPos(new Point(e.offsetX * dpi, e.offsetY * dpi));
+    boardPos = tryBump(gameState(), boardPos, interfaceState.placeType);
 
-  if (canPlaceTower(gameState(), boardPos, interfaceState.placeType)) {
-  } else {
-    let tower = getTowerByPos(gameState(), boardPos);
-    if (tower !== null) {
-      boardPos = tower.origin;
+    if (!canPlaceTower(gameState(), boardPos, interfaceState.placeType)) {
+      let tower = getTowerByPos(gameState(), boardPos);
+      if (tower !== null) {
+        boardPos = tower.origin;
+      }
     }
-  }
 
-  interfaceState.lastMouse = boardPos;
-  drawState();
+    interfaceState.lastMouse = boardPos;
+    drawState();
+  }
 });
 
 canvas.mousedown((e) => {
   let boardPos = getBoardPos(new Point(e.offsetX * dpi, e.offsetY * dpi));
-  boardPos = tryBump(gameState(), boardPos, interfaceState.placeType);
 
   let tower = getTowerByPos(gameState(), boardPos);
   if (tower === null) {
-    if (canPlaceTowerWithPath(clientState(), interfaceState.lastMouse, interfaceState.placeType)) {
-      //Create Tower
-      send({
-        type: "addTower",
-        value: {
-          origin: boardPos,
-          type: interfaceState.placeType
-        }
-      });
+    if (interfaceState.placeType !== null) {
+      let placePos = tryBump(gameState(), boardPos, interfaceState.placeType);
+      if (canPlaceTowerWithPath(clientState(), placePos, interfaceState.placeType)) {
+        //Create Tower
+        send({
+          type: "addTower",
+          value: {
+            origin: boardPos,
+            type: interfaceState.placeType
+          }
+        });
+      }
     }
   } else {
     //Select Tower
@@ -203,6 +253,7 @@ canvas.mousedown((e) => {
 
   interfaceState.lastMouse = boardPos;
   drawState();
+  e.preventDefault();
 });
 
 // Debug only

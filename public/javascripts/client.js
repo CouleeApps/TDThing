@@ -17,9 +17,12 @@ client.joinOrCreate("tdmp", {}).then((room) => {
   room.onStateChange.once((state) => {
     console.log(state);
     initInterface();
+    drawState();
+    updateInterface();
   });
   room.onStateChange((state) => {
     drawState();
+    updateInterface();
   });
 
   room.onMessage((data) => {

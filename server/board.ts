@@ -65,8 +65,8 @@ export class Paths extends Schema {
     let queue = new TinyQueue([start], (a, b) => {
       return a.distSq(end) - b.distSq(end);
     });
-    let paths = new Map<string, [Point]>();
-    paths.set(toKey(start), [start]);
+    let paths = new Map<string, Point[]>();
+    paths.set(toKey(start), []);
 
     while (queue.length > 0) {
       let top = queue.pop();
@@ -94,15 +94,15 @@ export class Paths extends Schema {
       });
       neighbors.forEach((n) => {
         queue.push(n);
-        // @ts-ignore
-        paths.set(toKey(n), [top].concat(paths.get(toKey(top))));
+        paths.set(toKey(n), [top!].concat(paths.get(toKey(top!))!));
       });
     }
     if (paths.get(toKey(end)) === undefined) {
-      return new ArraySchema();
+      return new ArraySchema<Point>();
     } else {
-      // @ts-ignore
-      return new ArraySchema(end).concat(paths.get(toKey(end))).reverse();
+      let schema = new ArraySchema<Point>();
+      paths.get(toKey(end))!.reverse().forEach((pt) => schema.push(pt));
+      return schema;
     }
   }
 
@@ -198,6 +198,6 @@ export class Board extends Schema {
 
   getSolution(fromSide = "top", exclude: Point[] = []) {
     this.solution.setExclude(exclude);
-    return this.solution.get(fromSide).map((pt) => pt.clone());
+    return this.solution.get(fromSide).clone();
   }
 }

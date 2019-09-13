@@ -82,16 +82,19 @@ export class TowerType extends Schema {
   damagePerSecond: number;
   @type("number")
   range: number;
+  @type("number")
+  cost: number;
   @type([ Point ])
   reachable: ArraySchema<Point>;
 
-  constructor(name: string, extent: Point, health: number, damagePerSecond: number, range: number) {
+  constructor(name: string, extent: Point, health: number, damagePerSecond: number, range: number, cost: number) {
     super();
     this.name = name;
     this.extent = extent;
     this.health = health;
     this.damagePerSecond = damagePerSecond;
     this.range = range;
+    this.cost = cost;
 
     // Find effective area
     let reachable = new ArraySchema();

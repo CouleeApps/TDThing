@@ -2,7 +2,7 @@ import {Point, Rect} from "./math";
 import {TargetStyle, Tower, TowerType} from "./tower";
 import {Unit, UnitType} from "./unit";
 import {Board, Cell} from "./board";
-import {Schema, ArraySchema, MapSchema, type} from "@colyseus/schema";
+import {ArraySchema, MapSchema, Schema, type} from "@colyseus/schema";
 
 export class ClientState extends Schema {
   gameState: GameState;
@@ -14,6 +14,12 @@ export class ClientState extends Schema {
   playableRegion: Rect;
   @type("number")
   health: number;
+  @type("number")
+  money: number;
+  @type("boolean")
+  ready: boolean;
+  @type([ "string" ])
+  unitQueue: ArraySchema<string>;
 
   constructor(gameState: GameState, side: string, region: Rect) {
     super();
@@ -21,10 +27,25 @@ export class ClientState extends Schema {
     this.side = side;
     this.playableRegion = region;
     this.health = 100;
+    this.money = 200;
+    this.ready = false;
+    this.unitQueue = new ArraySchema();
   }
 
   reset() {
     this.username = undefined;
+  }
+
+  canSpend(amount: number): boolean {
+    return this.money >= amount;
+  }
+
+  spend(amount: number) {
+    this.money -= amount;
+  }
+
+  canPlace(): boolean {
+    return this.gameState.roundState === RoundState.Constructing && !this.ready;
   }
 
   // If the player can place a tower, unobstructed, maintaining the path
@@ -37,9 +58,14 @@ export class ClientState extends Schema {
       return false;
     }
     let path = this.gameState.board.getSolution("top", poses);
-    let can = path.length > 0;
-    return can;
+    return path.length > 0;
   }
+}
+
+export enum RoundState {
+  Waiting = "Waiting",
+  Constructing = "Constructing",
+  Playing = "Playing",
 }
 
 export class GameState extends Schema {
@@ -57,8 +83,12 @@ export class GameState extends Schema {
   clientStates: MapSchema<ClientState>;
   @type([ "string" ])
   targetStyles: ArraySchema<TargetStyle>;
+  @type("string")
+  roundState: RoundState;
   lastTowerId: number;
   lastUnitId: number;
+
+  shittyDelete: boolean = true;
 
   constructor(board: Board) {
     super();
@@ -66,6 +96,7 @@ export class GameState extends Schema {
     this.units = new ArraySchema();
     this.board = board;
     this.clientStates = new MapSchema<ClientState>();
+    this.roundState = RoundState.Waiting;
 
     this.towerTypes = new MapSchema({
       "normal": new TowerType(
@@ -73,21 +104,24 @@ export class GameState extends Schema {
         new Point(2, 2),
         100,
         1,
-        5
+        5,
+        10
       ),
       "chonky": new TowerType(
         "chonky",
         new Point(3, 3),
         400,
         10,
-        3
+        3,
+        50
       ),
       "rangey": new TowerType(
         "rangey",
         new Point(2, 2),
         100,
         0.6,
-        8
+        8,
+        30
       ),
       // TODO: More of these
     });
@@ -96,19 +130,22 @@ export class GameState extends Schema {
         "normal",
         100,
         25,
-        1
+        1,
+        3
       ),
       "chonky": new UnitType(
         "chonky",
         250,
         100,
-        5
+        5,
+        15
       ),
       "speedy": new UnitType(
         "speedy",
         60,
         20,
-        1
+        1,
+        10
       ),
       // TODO: More of these
     });
@@ -158,9 +195,12 @@ export class GameState extends Schema {
       this.board.setCell(pos, Cell.emptyCell());
     });
     // TODO: When splice is no longer broken, use it instead of this hack
-    tower.deleted = true;
-    // let index = this.towers.indexOf(tower);
-    // this.towers.splice(index, 1);
+    if (this.shittyDelete) {
+      tower.deleted = true;
+    } else {
+      let index = this.towers.indexOf(tower);
+      this.towers.splice(index, 1);
+    }
   }
 
   getTowerPoses(origin: Point, type: string) {
@@ -191,8 +231,54 @@ export class GameState extends Schema {
 
   destroyUnit(unit: Unit) {
     // TODO: Huge hack here too
-    unit.deleted = true;
-    // this.units.splice(this.units.indexOf(unit), 1);
+    if (this.shittyDelete) {
+      unit.deleted = true;
+    } else {
+      this.units.splice(this.units.indexOf(unit), 1);
+    }
+  }
+
+  checkStart() {
+    if (this.roundState === RoundState.Constructing &&
+      this.clientStates["top"].ready && this.clientStates["bottom"].ready) {
+      // Start!
+      this.startRound()
+    }
+  }
+
+  startRound() {
+    this.roundState = RoundState.Playing;
+    let startSide = (side: string) => {
+      this.clientStates[side].ready = false;
+      this.clientStates[side].unitQueue.forEach((type: string, index: number) => {
+        setTimeout(() => {
+          this.spawnUnit(side, type);
+        }, index * 500);
+      });
+      this.clientStates[side].unitQueue.splice(0, this.clientStates[side].unitQueue);
+    };
+    startSide("top");
+    startSide("bottom");
+  }
+
+  updateRound(deltaMS: number) {
+    switch (this.roundState) {
+      case RoundState.Waiting:
+        break;
+      case RoundState.Constructing:
+        break;
+      case RoundState.Playing:
+        this.moveUnits(deltaMS);
+        this.towerAttack(deltaMS);
+
+        if (this.units.filter((unit) => !unit.deleted).length === 0) {
+          // Everything is dead, round over
+          this.roundState = RoundState.Waiting;
+          setTimeout(() => this.roundState = RoundState.Constructing, 1000);
+        }
+
+        break;
+    }
   }
 
   // Returns a list of events that happened
@@ -204,21 +290,6 @@ export class GameState extends Schema {
       let path = (unit.side === "top" ? topPath : bottomPath);
       unit.accumulatedMS += deltaMS;
       if (unit.accumulatedMS >= this.unitTypes[unit.type].msPerMove) {
-        // TODO: Interpolate? Might do that in interface
-        unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
-        unit.pathPosition += 1;
-        unit.position = unit.path[unit.pathPosition].clone();
-        if (unit.pathPosition !== unit.path.length - 1) {
-            unit.nextPosition = unit.path[unit.pathPosition + 1].clone();
-        }
-
-        events.push({
-          type: "unitMove",
-          data: {
-            unit: unit
-          }
-        });
-
         if (unit.position === unit.destination || unit.pathPosition >= unit.path.length - 1) {
           // TODO: Damage to base
           this.destroyUnit(unit);
@@ -229,6 +300,21 @@ export class GameState extends Schema {
             }
           });
           return;
+        } else {
+          // TODO: Interpolate? Might do that in interface
+          unit.accumulatedMS -= this.unitTypes[unit.type].msPerMove;
+          unit.pathPosition += 1;
+          unit.position = unit.path[unit.pathPosition].clone();
+          if (unit.pathPosition !== unit.path.length - 1) {
+            unit.nextPosition = unit.path[unit.pathPosition + 1].clone();
+          }
+
+          events.push({
+            type: "unitMove",
+            data: {
+              unit: unit
+            }
+          });
         }
 
         // Update which towers we're in range of
@@ -300,6 +386,8 @@ export class GameState extends Schema {
     let updatePaths = false;
     for (let i = 0; i < this.towers.length; i ++) {
       let tower = this.towers[i];
+      if (tower.deleted)
+        continue;
 
       if (tower.health <= 0) {
         this.removeTower(tower);
@@ -309,12 +397,14 @@ export class GameState extends Schema {
             tower: tower
           }
         });
-        i --;
+        if (!this.shittyDelete) {
+          i--;
+        }
         updatePaths = true;
       }
     }
     if (updatePaths) {
-      this.units.forEach((unit) => unit.updatePath());
+      this.units.filter((unit) => !unit.deleted).forEach((unit) => unit.updatePath());
     }
     return events;
   }

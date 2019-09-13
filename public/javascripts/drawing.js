@@ -196,7 +196,7 @@ function drawState() {
   if (currentTower) {
     drawTowerRange(currentTower.center, currentTower.type);
     drawTower(currentTower);
-  } else if (canPlaceTower(gameState(), interfaceState.lastMouse, interfaceState.placeType)) {
+  } else if (interfaceState.placeType !== null && canPlaceTower(gameState(), interfaceState.lastMouse, interfaceState.placeType)) {
     let type = canPlaceTowerWithPath(clientState(), interfaceState.lastMouse, interfaceState.placeType) ? "hoverCell" : "error";
     getTowerPoses(gameState(), interfaceState.lastMouse, interfaceState.placeType).forEach((pos) => {
       drawCell(type, pos);

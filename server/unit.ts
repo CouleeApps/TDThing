@@ -74,11 +74,14 @@ export class UnitType extends Schema {
   health: number;
   @type("number")
   damagePerSecond: number;
-  constructor(name: string, msPerMove: number, health: number, damagePerSecond: number) {
+  @type("number")
+  cost: number;
+  constructor(name: string, msPerMove: number, health: number, damagePerSecond: number, cost: number) {
     super();
     this.name = name;
     this.msPerMove = msPerMove;
     this.health = health;
     this.damagePerSecond = damagePerSecond;
+    this.cost = cost;
   }
 }

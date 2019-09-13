@@ -16,26 +16,34 @@
     </div>
     <canvas id="game"></canvas>
     <div id="controls">
-        <div class="box">
+        <div class="box constructModeOnly" id="debugBox">
             <strong>DEBUG</strong>
             <div>
                 <button id="lazyTop">Premade map (top)</button>
+                <br>
                 <button id="lazyBottom">Premade map (bottom)</button>
             </div>
         </div>
-        <div class="box">
+        <div class="box constructModeOnly" id="towerBox">
             <strong>Place Tower Type:</strong>
+            <br>
+            <span id="money">Money: 0</span>
             <div id="towerTypes">
                 <strong>Loading...</strong>
             </div>
         </div>
-        <div class="box">
+        <div class="box constructModeOnly" id="unitBox">
             <strong>Send Units</strong>
             <div id="unitTypes">
                 <strong>Loading...</strong>
             </div>
         </div>
-        <div class="box">
+        <div class="box constructModeOnly" id="readyBox">
+            <div>
+                <button id="readyButton">Done Turn</button>
+            </div>
+        </div>
+        <div class="box" id="selectionBox">
             <strong>Current Selection</strong>
             <div id="selection">
                 <strong>Stats</strong>
@@ -49,13 +57,13 @@
                 <button id="destroyTower">Destroy</button>
             </div>
         </div>
-        <div class="box">
+        <div class="box" id="nextWaveBox">
             <strong>Next Wave</strong>
-            <div id="nextWave">
+            <div id="unitQueue">
                 <strong>TODO</strong>
             </div>
         </div>
-        <div class="box">
+        <div class="box" id="scoresBox">
             <strong>Scores</strong>
             <div id="scores">
                 <strong>TODO</strong>
